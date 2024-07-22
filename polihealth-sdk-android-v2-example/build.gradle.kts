@@ -15,6 +15,20 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField(
+            "String", "API_URL",
+            "\"https://mapi-stg.health-on.co.kr\""
+        )
+        buildConfigField(
+            "String",
+            "CLIENT_ID", "\"3270e7da-55b1-4dd4-abb9-5c71295b849b\""
+        )
+        buildConfigField(
+            "String",
+            "CLIENT_SECRET",
+            "\"eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJpbmZyYSI6IkhlYWx0aE9uLVN0YWdpbmciLCJjbGllbnQtaWQiOiIzMjcwZTdkYS01NWIxLTRkZDQtYWJiOS01YzcxMjk1Yjg0OWIifQ.u0rBK-2t3l4RZ113EzudZsKb0Us9PEtiPcFDBv--gYdJf9yZJQOpo41XqzbgSdDa6Z1VDrgZXiOkIZOTeeaEYA\""
+        )
     }
 
     buildTypes {
@@ -33,6 +47,10 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
+
+    buildFeatures {
+        buildConfig = true
+    }
 }
 
 dependencies {
@@ -50,7 +68,4 @@ dependencies {
 
     implementation(project(":polihealth-sdk-android-v2"))
     implementation(project(":bluetooth-sdk-android-v2"))
-
-    val serialization_version: String by project
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serialization_version")
 }

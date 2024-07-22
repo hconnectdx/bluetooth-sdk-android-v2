@@ -1,6 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+
+    <!-- 블루투스 장치를 찾는 경우에만 필요합니다.-->
+    <!-- 앱이 블루투스 스캔 결과를 사용하여 물리적 위치 정보를 파생하지 않는 경우-->
+    <!-- 앱이 물리적 위치를 파생하지 않는다고 단언할 수 있습니다.-->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
+
+    <!-- 블루투스 장치가 다른 장치에서 검색할 수 있도록 만드는 경우에만 필요합니다.-->
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+
+    <!-- 앱이 이미 페어링된 블루투스 장치와 통신하는 경우에만 필요합니다.-->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!--    앱이 서비스를 지원하고 Android 10 (API 수준 29) 또는 Android 11에서 실행할 수 있는 경우,
+    ACCESS_BACKGROUND_LOCATION 권한도 선언하여 블루투스 기기를 검색해야 합니다.-->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
+    <!-- 앱이 저전력 블루투스를 사용하는 경우 다음을 사용할 수 있습니다.-->
+    <uses-feature
+        android:name="android.hardware.bluetooth_le"
+        android:required="true" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
