@@ -1,14 +1,15 @@
-import java.io.FileInputStream
 import java.util.Properties
+import java.io.FileInputStream
 
 plugins {
     alias(libs.plugins.androidLibrary)
     alias(libs.plugins.jetbrainsKotlinAndroid)
+    kotlin("plugin.serialization") version "1.6.21"
     `maven-publish`
 }
 
 android {
-    namespace = "kr.co.hconnect.bluetooth_sdk_android_v2"
+    namespace = "kr.co.hconnect.polihealth_sdk_android_v2"
     compileSdk = 34
 
     defaultConfig {
@@ -37,11 +38,24 @@ android {
 }
 
 dependencies {
+
+    val ktor_version: String by project
+    val logback_version: String by project
+
     implementation(libs.androidx.core.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
-    implementation(libs.kotlinx.coroutines.core)
+
+    implementation("io.ktor:ktor-client-core:2.0.0")
+    implementation("io.ktor:ktor-client-cio:2.0.0")
+    implementation("io.ktor:ktor-client-content-negotiation:2.0.0")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.0.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.0")
+
+    implementation("kr.co.hconnect:bluetooth-sdk-android-v2:0.0.4")
+//    implementation(project(":bluetooth-sdk-android-v2"))
 }
+
 
 val projectProps = Properties()
 projectProps.load(FileInputStream(project.file("project.properties")))
@@ -64,13 +78,26 @@ afterEvaluate {
                 artifactId = projectArtifactId
                 version = projectVersion
                 pom.packaging = "aar"
-                artifact("${layout.projectDirectory}/build/outputs/aar/bluetooth-sdk-android-v2-release.aar")
+
+                artifact("${layout.projectDirectory}/build/outputs/aar/polihealth-sdk-android-v2-release.aar")
+
+                pom.withXml {
+                    val dependenciesNode = asNode().appendNode("dependencies")
+                    configurations.implementation.get().allDependencies.forEach { dependency ->
+                        if (!dependency.group!!.startsWith("androidx")) {
+                            val dependencyNode = dependenciesNode.appendNode("dependency")
+                            dependencyNode.appendNode("groupId", dependency.group)
+                            dependencyNode.appendNode("artifactId", dependency.name)
+                            dependencyNode.appendNode("version", dependency.version)
+                        }
+                    }
+                }
             }
         }
 
         repositories {
             maven {
-                name = "bluetoothLib-sdk-android-v2"
+                name = "polihealth-sdk-android-v2"
                 url = uri(githubUrl)
                 credentials {
                     username = githubUsername

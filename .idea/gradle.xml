@@ -10,6 +10,8 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/bluetooth-sdk-android-v2" />
+            <option value="$PROJECT_DIR$/polihealth-sdk-android-v2" />
+            <option value="$PROJECT_DIR$/polihealth-sdk-android-v2-example" />
           </set>
         </option>
         <option name="resolveExternalAnnotations" value="false" />
