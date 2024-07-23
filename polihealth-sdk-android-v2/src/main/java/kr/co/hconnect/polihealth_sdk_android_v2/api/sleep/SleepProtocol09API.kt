@@ -2,19 +2,15 @@ package kr.co.hconnect.polihealth_sdk_android.api.sleep
 
 import android.os.Build
 import androidx.annotation.RequiresApi
-import io.ktor.client.request.forms.MultiPartFormDataContent
-import io.ktor.client.request.forms.formData
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.util.AttributeKey
-import io.ktor.util.InternalAPI
 import kotlinx.coroutines.runBlocking
-import kr.co.hconnect.polihealth_sdk_android.DateUtil
 import kr.co.hconnect.polihealth_sdk_android.PoliClient
 import kr.co.hconnect.polihealth_sdk_android.api.dto.request.HRSpO2
 import kr.co.hconnect.polihealth_sdk_android.api.dto.request.HRSpO2Request
-import kr.co.hconnect.polihealth_sdk_android.api.dto.response.SleepResponse
-import kr.co.hconnect.polihealth_sdk_android.api.dto.response.toSleepCommResponse
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.SleepResponse
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.toSleepResponse
 
 object SleepProtocol09API {
     /**
@@ -26,7 +22,7 @@ object SleepProtocol09API {
     suspend fun requestPost(
         reqDate: String,
         hrSpO2: HRSpO2
-    ): SleepResponse.SleepCommResponse {
+    ): SleepResponse {
 
         val requestBody = HRSpO2Request(
             reqDate = reqDate,
@@ -40,7 +36,7 @@ object SleepProtocol09API {
 
         val response = PoliClient.client.post("poli/sleep/protocol9") {
             setBody(requestBody)
-        }.call.attributes[AttributeKey("body")].toString().toSleepCommResponse()
+        }.call.attributes[AttributeKey("body")].toString().toSleepResponse()
 
         return response
     }

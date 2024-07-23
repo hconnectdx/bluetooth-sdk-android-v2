@@ -17,35 +17,14 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
+
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
     repositories {
         google()
         mavenCentral()
-    }
-}
-
-val localPropertiesFile = File(rootDir, "local.properties")
-val localProperties = Properties()
-localProperties.load(FileInputStream(localPropertiesFile))
-
-val githubUserName: String = localProperties.getProperty("github_user_name")
-val githubAccessToken: String = localProperties.getProperty("github_access_token")
-val githubUrl: String = localProperties.getProperty("github_url")
-
-dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories {
-        google()
-        mavenCentral()
-
         maven {
-            url = uri(githubUrl)
-
-            credentials {
-                username = githubUserName
-                password = githubAccessToken
-            }
+            url = uri("https://maven.pkg.github.com/hconnectdx/bluetooth-sdk-android-v2")
         }
     }
 }

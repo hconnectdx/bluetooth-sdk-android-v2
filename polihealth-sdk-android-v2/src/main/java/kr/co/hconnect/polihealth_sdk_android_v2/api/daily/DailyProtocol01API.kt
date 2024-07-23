@@ -11,9 +11,8 @@ import kr.co.hconnect.polihealth_sdk_android.PoliClient
 import kr.co.hconnect.polihealth_sdk_android.api.dto.request.HRSpO2
 import kr.co.hconnect.polihealth_sdk_android.api.dto.request.HRSpO2Request
 import kr.co.hconnect.polihealth_sdk_android.api.dto.request.LTMRequest
-import kr.co.hconnect.polihealth_sdk_android.api.dto.response.SleepResponse
-import kr.co.hconnect.polihealth_sdk_android.api.dto.response.toSleepCommResponse
-import kr.co.hconnect.polihealth_sdk_android.api.sleep.SleepSessionAPI
+import kr.co.hconnect.polihealth_sdk_android.api.dto.response.BaseResponse
+import kr.co.hconnect.polihealth_sdk_android.api.dto.response.toBaseResponse
 import kr.co.hconnect.polihealth_sdk_android_app.api.dto.request.LTMModel
 
 object DailyProtocol01API {
@@ -23,12 +22,12 @@ object DailyProtocol01API {
      * @param reqDate ex) 20240704054513 (yyyyMMddHHmmss)
      * @param LTMModel
      *
-     * @return SleepCommResponse
+     * @return Protocol1Response
      * */
     suspend fun requestPost(
         reqDate: String,
         ltmModel: LTMModel
-    ): SleepResponse.SleepCommResponse {
+    ): BaseResponse {
 
         val requestBody = LTMRequest(
             reqDate = reqDate,
@@ -38,7 +37,7 @@ object DailyProtocol01API {
 
         val response = PoliClient.client.post("poli/day/protocol1") {
             setBody(requestBody)
-        }.call.attributes[AttributeKey("body")].toString().toSleepCommResponse()
+        }.call.attributes[AttributeKey("body")].toString().toBaseResponse()
 
         return response
     }

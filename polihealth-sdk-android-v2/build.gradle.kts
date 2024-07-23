@@ -35,6 +35,19 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
+
+    repositories {
+        google()
+        mavenCentral()
+        maven {
+            url = uri("https://maven.pkg.github.com/hconnectdx/bluetooth-sdk-android-v2")
+
+            credentials {
+                username = "hconnectdx"
+                password = ""
+            }
+        }
+    }
 }
 
 dependencies {
@@ -54,8 +67,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
 
     implementation("org.slf4j:slf4j-simple:1.7.30")
-    implementation("kr.co.hconnect:bluetooth-sdk-android-v2:0.0.4")
-//    implementation("io.ktor:ktor-client-multipart:2.0.0") // 멀티파트 지원
+    implementation("kr.co.hconnect:bluetooth-sdk-android-v2:0.0.2")
 
 //    implementation(project(":bluetooth-sdk-android-v2"))
 }

@@ -1,19 +1,18 @@
-package kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response
+package kr.co.hconnect.polihealth_sdk_android.api.dto.response
 
-import kr.co.hconnect.polihealth_sdk_android.api.dto.response.BaseResponse
-import kr.co.hconnect.polihealth_sdk_android.api.dto.response.PoliResponse
 import org.json.JSONException
 import org.json.JSONObject
 
-data class SleepResponse(
-    var data: Data? = null
+data class SleepEndResponse(
+    val data: Data? = null
 ) : BaseResponse(), PoliResponse {
+
     data class Data(
-        val sessionId: String
+        val sleepQuality: Int
     )
 }
 
-fun String.toSleepResponse(): SleepResponse {
+fun String.toSleepEndResponse(): SleepEndResponse {
     val jsonObject = JSONObject(this)
 
     val retCd = jsonObject.optString("retCd")
@@ -23,24 +22,21 @@ fun String.toSleepResponse(): SleepResponse {
     try {
         val dataObject: JSONObject? = jsonObject.getJSONObject("data")
         dataObject?.let {
-            val sessionId = it.getString("sessionId")
-
-            val data = SleepResponse.Data(
-                sessionId = sessionId,
-            )
-            return SleepResponse(data).apply {
+            val sleepQuality = it.getInt("sleepQuality")
+            val data = SleepEndResponse.Data(sleepQuality = sleepQuality)
+            return SleepEndResponse(data).apply {
                 this.retCd = retCd
                 this.retMsg = retMsg
                 this.resDate = resDate
             }
         }
-            ?: return SleepResponse(null).apply {
+            ?: return SleepEndResponse(null).apply {
                 this.retCd = retCd
                 this.retMsg = retMsg
                 this.resDate = resDate
             }
     } catch (e: JSONException) {
-        return SleepResponse(null).apply {
+        return SleepEndResponse(null).apply {
             this.retCd = retCd
             this.retMsg = retMsg
             this.resDate = resDate
