@@ -66,7 +66,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
 
-    implementation("kr.co.hconnect:polihealth-sdk-android-v2:0.0.1")
-//    implementation(project(":polihealth-sdk-android-v2"))
-//    implementation(project(":bluetooth-sdk-android-v2"))
+//    implementation("kr.co.hconnect:polihealth-sdk-android-v2:0.0.1")
+    implementation(project(":polihealth-sdk-android-v2"))
+    implementation(project(":bluetooth-sdk-android-v2"))
 }

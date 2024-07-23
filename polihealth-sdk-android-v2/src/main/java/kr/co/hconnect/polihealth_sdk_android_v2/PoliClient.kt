@@ -18,30 +18,27 @@ import io.ktor.util.toByteArray
 import kotlinx.serialization.json.Json
 
 object PoliClient {
-    private lateinit var _client: HttpClient
-    val client: HttpClient get() = _client
-
-    private lateinit var _baseUrl: String
-    val baseUrl: String get() = _baseUrl
-
-    private var _userAge: Int = 49
-    var userAge: Int
-        get() = _userAge
-        set(value) {
-            _userAge = value
-        }
-
-
+    lateinit var client: HttpClient
+    private var baseUrl: String = ""
+    var userAge: Int = 0
+    var userSno: Int = 0
     var sessionId: String = ""
-    var userSno: Int = 12
 
+
+    /**
+     * TODO PoliClient 초기화
+     *
+     * @param baseUrl
+     * @param clientId
+     * @param clientSecret
+     */
     fun init(
         baseUrl: String,
         clientId: String,
         clientSecret: String
     ) {
-        _baseUrl = baseUrl
-        _client = HttpClient(CIO) {
+        this.baseUrl = baseUrl
+        client = HttpClient(CIO) {
 
             defaultRequest {
                 header("accept", "application/json")
@@ -67,8 +64,17 @@ object PoliClient {
     }
 
 
+    /**
+     * TODO 로그를 찍어주는 Interceptor
+     *
+     * 1. Request 정보를 찍어준다.
+     * 2. Response 정보를 찍어준다.
+     */
     private fun addLoggerInterceptor() {
-        _client.sendPipeline.intercept(HttpSendPipeline.Before) {
+        if (::client.isInitialized.not()) {
+            throw IllegalStateException("PoliClient is not initialized")
+        }
+        client.sendPipeline.intercept(HttpSendPipeline.Before) {
             println()
             println("[Request]")
             println("Method: ${this.context.method.value}")
@@ -108,7 +114,7 @@ object PoliClient {
      * @param jsonString
      * @return prettyJson
      */
-    fun prettyPrintJson(jsonString: String): String {
+    private fun prettyPrintJson(jsonString: String): String {
         var indentLevel = 0
         val indentSpace = 4
         val prettyJson = StringBuilder()

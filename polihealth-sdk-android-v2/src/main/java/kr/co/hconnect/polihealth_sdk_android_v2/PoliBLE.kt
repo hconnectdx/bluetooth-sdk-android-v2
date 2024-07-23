@@ -71,12 +71,11 @@ object PoliBLE {
                                     DateUtil.getCurrentDateTime(),
                                     parsedData
                                 )
-                                onReceive.invoke(ProtocolType.PROTOCOL_2, null)
+                                onReceive.invoke(ProtocolType.PROTOCOL_1, null)
                             }
                         }
 
                         0x02.toByte() -> {
-                            onReceive.invoke(ProtocolType.PROTOCOL_2, null)
                             DailyProtocol02API.addByte(removeFrontTwoBytes(it, 2))
                         }
 

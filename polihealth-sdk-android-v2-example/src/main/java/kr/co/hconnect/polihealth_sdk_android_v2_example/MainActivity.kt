@@ -54,7 +54,7 @@ class MainActivity : AppCompatActivity() {
     private fun setBtnScan() {
         val btnStartScan: Button = findViewById(R.id.btn_start_scan)
         btnStartScan.setOnClickListener {
-            
+
             val isGranted = PermissionManager.isGrantedPermissions(
                 context = this@MainActivity,
                 permissions = Permissions.PERMISSION_SDK_31
@@ -230,6 +230,8 @@ class MainActivity : AppCompatActivity() {
             clientSecret = BuildConfig.CLIENT_SECRET
         )
         PermissionManager.registerPermissionLauncher(this)
+        PoliClient.userAge = 111
+        PoliClient.userSno = 999
     }
 
     private inner class DeviceListAdapter(private val devices: List<BluetoothDevice>) :
