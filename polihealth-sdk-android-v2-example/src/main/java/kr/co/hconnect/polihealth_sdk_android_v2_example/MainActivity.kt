@@ -33,11 +33,14 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         setBtnProtocolTest()
+        setDeviceList()
+        setBtnScan()
+    }
+
+    private fun setDeviceList() {
         deviceListAdapter = DeviceListAdapter(deviceList)
         val listView: ListView = findViewById(R.id.lv_devices)
         listView.adapter = deviceListAdapter
-
-
 
         listView.setOnItemClickListener { parent, view, position, id ->
             val selectedItem = deviceList[position]
@@ -46,11 +49,12 @@ class MainActivity : AppCompatActivity() {
             }
             startActivity(intent)
         }
+    }
 
+    private fun setBtnScan() {
         val btnStartScan: Button = findViewById(R.id.btn_start_scan)
         btnStartScan.setOnClickListener {
-
-
+            
             val isGranted = PermissionManager.isGrantedPermissions(
                 context = this@MainActivity,
                 permissions = Permissions.PERMISSION_SDK_31
@@ -68,7 +72,6 @@ class MainActivity : AppCompatActivity() {
                 )
             } else {
                 startScan()
-
                 deviceList.addAll(PoliBLE.getBondedDevices())
             }
         }

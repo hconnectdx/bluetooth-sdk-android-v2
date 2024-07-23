@@ -44,6 +44,16 @@ class DeviceDetailActivity : AppCompatActivity() {
             tvDeviceName.text = "Device: ${it.name ?: "Unknown"}"
         }
 
+        setExpandableList()
+
+        btnConnect.setOnClickListener {
+            device?.let {
+                connectToDevice(it)
+            }
+        }
+    }
+
+    private fun setExpandableList() {
         expandableListAdapter = CustomExpandableListAdapter(this, serviceList, characteristicMap)
         expandableListView.setAdapter(expandableListAdapter)
 
@@ -59,12 +69,6 @@ class DeviceDetailActivity : AppCompatActivity() {
                 startActivity(intent)
             }
             true
-        }
-
-        btnConnect.setOnClickListener {
-            device?.let {
-                connectToDevice(it)
-            }
         }
     }
 
