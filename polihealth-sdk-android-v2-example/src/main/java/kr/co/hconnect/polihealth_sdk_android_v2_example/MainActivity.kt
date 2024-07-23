@@ -20,6 +20,9 @@ import kr.co.hconnect.polihealth_sdk_android.api.daily.DailyProtocol01API
 import kr.co.hconnect.polihealth_sdk_android.api.dto.request.HRSpO2
 import kr.co.hconnect.polihealth_sdk_android.service.sleep.SleepApiService
 import kr.co.hconnect.polihealth_sdk_android_app.service.sleep.DailyApiService
+import kr.co.hconnect.polihealth_sdk_android_v2_example.device_detail.DeviceDetailActivity
+import kr.co.hconnect.polihealth_sdk_android_v2_example.permission.PermissionManager
+import kr.co.hconnect.polihealth_sdk_android_v2_example.permission.Permissions
 
 class MainActivity : AppCompatActivity() {
 

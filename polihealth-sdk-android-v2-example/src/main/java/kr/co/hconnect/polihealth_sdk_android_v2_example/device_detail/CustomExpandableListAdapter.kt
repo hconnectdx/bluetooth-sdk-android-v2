@@ -1,3 +1,5 @@
+package kr.co.hconnect.polihealth_sdk_android_v2_example.device_detail
+
 import android.content.Context
 import android.view.LayoutInflater
 import android.view.View

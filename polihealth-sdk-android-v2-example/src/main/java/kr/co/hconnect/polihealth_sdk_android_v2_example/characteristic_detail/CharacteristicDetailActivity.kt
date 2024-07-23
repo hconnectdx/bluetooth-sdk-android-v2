@@ -1,12 +1,12 @@
-package kr.co.hconnect.polihealth_sdk_android_v2_example
+package kr.co.hconnect.polihealth_sdk_android_v2_example.characteristic_detail
 
-import android.bluetooth.BluetoothGattCharacteristic
 import android.os.Bundle
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import android.widget.Toast
 import kr.co.hconnect.polihealth_sdk_android.PoliBLE
+import kr.co.hconnect.polihealth_sdk_android_v2_example.R
 
 class CharacteristicDetailActivity : AppCompatActivity() {
 

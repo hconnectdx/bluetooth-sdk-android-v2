@@ -13,3 +13,5 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+polihealth-sdk-android-v2/project.properties

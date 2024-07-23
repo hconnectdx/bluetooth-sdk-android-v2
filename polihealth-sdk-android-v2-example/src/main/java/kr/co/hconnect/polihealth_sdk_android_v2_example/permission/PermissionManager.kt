@@ -1,4 +1,4 @@
-package kr.co.hconnect.polihealth_sdk_android_v2_example
+package kr.co.hconnect.polihealth_sdk_android_v2_example.permission
 
 import android.content.Context
 import android.content.pm.PackageManager
@@ -33,7 +33,7 @@ object PermissionManager {
         permissions: Array<String>,
         resultCallback: (permissions: Map<String, Boolean>) -> Unit
     ) {
-        this.resultCallback = resultCallback
+        PermissionManager.resultCallback = resultCallback
         permissionLauncher.launch(permissions)
     }
 

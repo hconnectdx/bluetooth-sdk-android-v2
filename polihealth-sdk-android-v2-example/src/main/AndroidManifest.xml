@@ -48,8 +48,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".DeviceDetailActivity" />
-        <activity android:name=".CharacteristicDetailActivity" />
+        <activity android:name=".device_detail.DeviceDetailActivity" />
+        <activity android:name=".characteristic_detail.CharacteristicDetailActivity" />
 
     </application>
 
