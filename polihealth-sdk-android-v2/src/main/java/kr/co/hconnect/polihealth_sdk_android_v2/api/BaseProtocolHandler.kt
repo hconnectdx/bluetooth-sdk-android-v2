@@ -31,13 +31,13 @@ open class BaseProtocolHandler {
 
         _byteArray = byteArrayOf()
         Log.d("RepositoryProtocol06", tempByteArray.toHexString())
-        context?.let {
-            saveToFile(
-                it,
-                tempByteArray,
-                "protocol${DateUtil.getCurrentDateTime()}.bin"
-            )
-        } // 클론한 데이터를 파일로 저장
+//        context?.let {
+//            saveToFile(
+//                it,
+//                tempByteArray,
+//                "protocol${DateUtil.getCurrentDateTime()}.bin"
+//            )
+//        } // 클론한 데이터를 파일로 저장
         return tempByteArray // 클론한 데이터를 반환
     }
 

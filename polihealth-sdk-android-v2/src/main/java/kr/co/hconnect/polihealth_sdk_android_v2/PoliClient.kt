@@ -56,7 +56,6 @@ object PoliClient {
                     isLenient = true
                     ignoreUnknownKeys = true
                 })
-
             }
 
             engine {

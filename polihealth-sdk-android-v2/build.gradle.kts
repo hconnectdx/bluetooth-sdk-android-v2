@@ -46,13 +46,17 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
 
-    implementation("io.ktor:ktor-client-core:2.0.0")
-    implementation("io.ktor:ktor-client-cio:2.0.0")
-    implementation("io.ktor:ktor-client-content-negotiation:2.0.0")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:2.0.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.0")
+    // ktor 버전을 꼭 맞춰야한다. 버전 호환성 이슈 심각 함.
+    implementation("io.ktor:ktor-client-core:2.0.3")
+    implementation("io.ktor:ktor-client-cio:2.0.3")
+    implementation("io.ktor:ktor-client-content-negotiation:2.0.3")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.0.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
 
+    implementation("org.slf4j:slf4j-simple:1.7.30")
     implementation("kr.co.hconnect:bluetooth-sdk-android-v2:0.0.4")
+//    implementation("io.ktor:ktor-client-multipart:2.0.0") // 멀티파트 지원
+
 //    implementation(project(":bluetooth-sdk-android-v2"))
 }
 

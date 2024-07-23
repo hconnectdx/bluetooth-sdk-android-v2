@@ -28,17 +28,23 @@ class SleepApiService {
      * @return SleepCommResponse
      */
     suspend fun sendProtocol06(context: Context? = null): SleepResponse.SleepCommResponse? {
-        val protocol6Bytes = SleepProtocol06API.flush(context)
-        if (protocol6Bytes.isNotEmpty()) {
-            val response: SleepResponse.SleepCommResponse =
-                SleepProtocol06API.requestPost(
-                    DateUtil.getCurrentDateTime(),
-                    protocol6Bytes
-                )
-            return response
-        } else {
-            return null
+        try {
+            val protocol6Bytes = SleepProtocol06API.flush(context)
+            if (protocol6Bytes.isNotEmpty()) {
+                val response: SleepResponse.SleepCommResponse =
+                    SleepProtocol06API.requestPost(
+                        DateUtil.getCurrentDateTime(),
+                        protocol6Bytes
+                    )
+                return response
+            } else {
+                return null
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
+        return null
+
     }
 
     /**

@@ -54,7 +54,6 @@ android {
 }
 
 dependencies {
-
     implementation(libs.androidx.core.ktx)
     implementation(platform(libs.kotlin.bom))
     implementation(libs.androidx.appcompat)
@@ -65,6 +64,7 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.android)
 
     implementation(project(":polihealth-sdk-android-v2"))
     implementation(project(":bluetooth-sdk-android-v2"))
