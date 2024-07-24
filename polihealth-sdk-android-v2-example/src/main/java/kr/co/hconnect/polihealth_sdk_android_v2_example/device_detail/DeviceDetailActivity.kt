@@ -19,7 +19,11 @@ import kotlinx.coroutines.launch
 import kr.co.hconnect.polihealth_sdk_android.BLEState
 import kr.co.hconnect.polihealth_sdk_android.PoliBLE
 import kr.co.hconnect.polihealth_sdk_android.ProtocolType
+import kr.co.hconnect.polihealth_sdk_android.api.dto.response.BaseResponse
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.PoliResponse
+import kr.co.hconnect.polihealth_sdk_android.api.dto.response.SleepEndResponse
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Protocol2Response
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.SleepResponse
 import kr.co.hconnect.polihealth_sdk_android_v2_example.characteristic_detail.CharacteristicDetailActivity
 import kr.co.hconnect.polihealth_sdk_android_v2_example.R
 
@@ -82,6 +86,28 @@ class DeviceDetailActivity : AppCompatActivity() {
             device,
             onReceive = { type: ProtocolType, response: PoliResponse? ->
                 Log.d("DeviceDetailActivity", "onReceive: $type, $response")
+
+                when (response) {
+                    is Protocol2Response -> {
+                        val protocol2Response = response as Protocol2Response
+                        Log.d("DeviceDetailActivity", "Protocol2Response: $protocol2Response")
+                    }
+
+                    is SleepResponse -> {
+                        val baseResponse = response as SleepResponse
+                        Log.d("DeviceDetailActivity", "BaseResponse: $baseResponse")
+                    }
+
+                    is SleepEndResponse -> {
+                        val baseResponse = response as SleepEndResponse
+                        Log.d("DeviceDetailActivity", "BaseResponse: $baseResponse")
+                    }
+
+                    is BaseResponse -> {
+                        val baseResponse = response as BaseResponse
+                        Log.d("DeviceDetailActivity", "BaseResponse: $baseResponse")
+                    }
+                }
             },
             onConnState = { state ->
                 CoroutineScope(Dispatchers.Main).launch {
