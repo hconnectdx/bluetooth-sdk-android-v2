@@ -13,7 +13,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kr.co.hconnect.bluetooth_sdk_android.HCBle
 import kr.co.hconnect.polihealth_sdk_android.api.daily.DailyProtocol01API
-import kr.co.hconnect.polihealth_sdk_android.api.dto.request.HRSpO2
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.BaseResponse
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.PoliResponse
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.SleepEndResponse
@@ -23,6 +22,7 @@ import kr.co.hconnect.polihealth_sdk_android.api.sleep.SleepProtocol08API
 import kr.co.hconnect.polihealth_sdk_android.service.sleep.SleepApiService
 import kr.co.hconnect.polihealth_sdk_android_app.api.sleep.DailyProtocol02API
 import kr.co.hconnect.polihealth_sdk_android_app.service.sleep.DailyApiService
+import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.SleepResponse
 
 object PoliBLE {

@@ -16,7 +16,3 @@ data class HRSpO2Request(
     )
 }
 
-data class HRSpO2(
-    val heartRate: Int,
-    val spo2: Int
-)

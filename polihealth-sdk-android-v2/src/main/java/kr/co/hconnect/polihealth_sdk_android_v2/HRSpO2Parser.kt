@@ -1,6 +1,6 @@
 package kr.co.hconnect.polihealth_sdk_android
 
-import kr.co.hconnect.polihealth_sdk_android.api.dto.request.HRSpO2
+import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
 
 object HRSpO2Parser {
     // 헥사값을 ASCII로 변환하는 함수

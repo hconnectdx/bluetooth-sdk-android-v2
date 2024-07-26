@@ -7,10 +7,10 @@ import io.ktor.client.request.setBody
 import io.ktor.util.AttributeKey
 import kotlinx.coroutines.runBlocking
 import kr.co.hconnect.polihealth_sdk_android.PoliClient
-import kr.co.hconnect.polihealth_sdk_android.api.dto.request.HRSpO2
 import kr.co.hconnect.polihealth_sdk_android.api.dto.request.HRSpO2Request
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.BaseResponse
-import kr.co.hconnect.polihealth_sdk_android.api.dto.response.toBaseResponse
+import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.toDaily3Response
 
 object DailyProtocol03API {
     /**
@@ -35,7 +35,7 @@ object DailyProtocol03API {
 
         val response = PoliClient.client.post("poli/day/protocol3") {
             setBody(requestBody)
-        }.call.attributes[AttributeKey("body")].toString().toBaseResponse()
+        }.call.attributes[AttributeKey("body")].toString().toDaily3Response(hrSpO2)
 
         return response
     }

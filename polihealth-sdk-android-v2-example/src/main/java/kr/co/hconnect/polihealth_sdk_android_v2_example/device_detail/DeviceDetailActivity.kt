@@ -22,7 +22,9 @@ import kr.co.hconnect.polihealth_sdk_android.ProtocolType
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.BaseResponse
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.PoliResponse
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.SleepEndResponse
-import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Protocol2Response
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily1Response
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily2Response
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily3Response
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.SleepResponse
 import kr.co.hconnect.polihealth_sdk_android_v2_example.characteristic_detail.CharacteristicDetailActivity
 import kr.co.hconnect.polihealth_sdk_android_v2_example.R
@@ -88,9 +90,19 @@ class DeviceDetailActivity : AppCompatActivity() {
                 Log.d("DeviceDetailActivity", "onReceive: $type, $response")
 
                 when (response) {
-                    is Protocol2Response -> {
-                        val protocol2Response = response as Protocol2Response
-                        Log.d("DeviceDetailActivity", "Protocol2Response: $protocol2Response")
+                    is Daily1Response -> {
+                        val daily1Response = response as Daily1Response
+                        Log.d("DeviceDetailActivity", "Protocol1Response: $daily1Response")
+                    }
+
+                    is Daily2Response -> {
+                        val daily2Response = response as Daily2Response
+                        Log.d("DeviceDetailActivity", "Protocol2Response: $daily2Response")
+                    }
+
+                    is Daily3Response -> {
+                        val daily3Response = response as Daily3Response
+                        Log.d("DeviceDetailActivity", "Protocol3Response: $daily3Response")
                     }
 
                     is SleepResponse -> {
