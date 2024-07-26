@@ -6,11 +6,11 @@ import kr.co.hconnect.polihealth_sdk_android_app.api.dto.request.LTMModel
 import org.json.JSONException
 import org.json.JSONObject
 
-data class Protocol1Response(
+data class Daily1Response(
     var ltmModel: LTMModel? = null
 ) : BaseResponse(), PoliResponse
 
-fun String.toProtocol1Response(ltmData: LTMModel): Protocol1Response {
+fun String.toDaily1Response(ltmData: LTMModel): Daily1Response {
     val jsonObject = JSONObject(this)
 
     val retCd = jsonObject.optString("retCd")
@@ -18,7 +18,7 @@ fun String.toProtocol1Response(ltmData: LTMModel): Protocol1Response {
     val resDate = jsonObject.optString("resDate")
 
     try {
-        return Protocol1Response(ltmData).apply {
+        return Daily1Response(ltmData).apply {
             this.retCd = retCd
             this.retMsg = retMsg
             this.resDate = resDate
@@ -26,7 +26,7 @@ fun String.toProtocol1Response(ltmData: LTMModel): Protocol1Response {
 
 
     } catch (e: JSONException) {
-        return Protocol1Response(null).apply {
+        return Daily1Response(null).apply {
             this.retCd = retCd
             this.retMsg = retMsg
             this.resDate = resDate

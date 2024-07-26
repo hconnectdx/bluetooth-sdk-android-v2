@@ -6,11 +6,11 @@ import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
 import org.json.JSONException
 import org.json.JSONObject
 
-data class Protocol3Response(
+data class Daily3Response(
     var hrSpO2: HRSpO2? = null
 ) : BaseResponse(), PoliResponse
 
-fun String.toProtocol3Response(hrSpO2: HRSpO2): Protocol3Response {
+fun String.toDaily3Response(hrSpO2: HRSpO2): Daily3Response {
     val jsonObject = JSONObject(this)
 
     val retCd = jsonObject.optString("retCd")
@@ -18,7 +18,7 @@ fun String.toProtocol3Response(hrSpO2: HRSpO2): Protocol3Response {
     val resDate = jsonObject.optString("resDate")
 
     try {
-        return Protocol3Response(hrSpO2).apply {
+        return Daily3Response(hrSpO2).apply {
             this.retCd = retCd
             this.retMsg = retMsg
             this.resDate = resDate
@@ -26,7 +26,7 @@ fun String.toProtocol3Response(hrSpO2: HRSpO2): Protocol3Response {
 
 
     } catch (e: JSONException) {
-        return Protocol3Response(null).apply {
+        return Daily3Response(null).apply {
             this.retCd = retCd
             this.retMsg = retMsg
             this.resDate = resDate

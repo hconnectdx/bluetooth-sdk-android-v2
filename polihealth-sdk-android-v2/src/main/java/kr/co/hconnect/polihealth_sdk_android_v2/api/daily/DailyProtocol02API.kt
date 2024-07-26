@@ -17,8 +17,8 @@ import io.ktor.util.InternalAPI
 import kotlinx.coroutines.runBlocking
 import kr.co.hconnect.polihealth_sdk_android.PoliClient
 import kr.co.hconnect.polihealth_sdk_android.api.BaseProtocolHandler
-import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Protocol2Response
-import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.toProtocol2Response
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily2Response
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.toDaily2Response
 
 object DailyProtocol02API : BaseProtocolHandler() {
 
@@ -32,8 +32,8 @@ object DailyProtocol02API : BaseProtocolHandler() {
     suspend fun requestPost(
         reqDate: String,
         byteArray: ByteArray
-    ): Protocol2Response {
-        val response: Protocol2Response =
+    ): Daily2Response {
+        val response: Daily2Response =
             PoliClient.client.post("poli/day/protocol2") {
                 body = MultiPartFormDataContent(
                     formData {
@@ -48,7 +48,7 @@ object DailyProtocol02API : BaseProtocolHandler() {
                         })
                     }
                 )
-            }.call.attributes[AttributeKey("body")].toString().toProtocol2Response()
+            }.call.attributes[AttributeKey("body")].toString().toDaily2Response()
 
         return response
     }
