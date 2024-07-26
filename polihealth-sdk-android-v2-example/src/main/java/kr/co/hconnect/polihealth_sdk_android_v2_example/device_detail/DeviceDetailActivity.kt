@@ -22,6 +22,7 @@ import kr.co.hconnect.polihealth_sdk_android.ProtocolType
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.BaseResponse
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.PoliResponse
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.SleepEndResponse
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Protocol1Response
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Protocol2Response
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.SleepResponse
 import kr.co.hconnect.polihealth_sdk_android_v2_example.characteristic_detail.CharacteristicDetailActivity
@@ -88,6 +89,11 @@ class DeviceDetailActivity : AppCompatActivity() {
                 Log.d("DeviceDetailActivity", "onReceive: $type, $response")
 
                 when (response) {
+                    is Protocol1Response -> {
+                        val protocol1Response = response as Protocol1Response
+                        Log.d("DeviceDetailActivity", "Protocol1Response: $protocol1Response")
+                    }
+
                     is Protocol2Response -> {
                         val protocol2Response = response as Protocol2Response
                         Log.d("DeviceDetailActivity", "Protocol2Response: $protocol2Response")

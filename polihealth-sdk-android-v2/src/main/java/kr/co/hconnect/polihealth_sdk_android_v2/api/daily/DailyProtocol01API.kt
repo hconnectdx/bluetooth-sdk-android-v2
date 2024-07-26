@@ -14,6 +14,7 @@ import kr.co.hconnect.polihealth_sdk_android.api.dto.request.LTMRequest
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.BaseResponse
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.toBaseResponse
 import kr.co.hconnect.polihealth_sdk_android_app.api.dto.request.LTMModel
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.toProtocol1Response
 
 object DailyProtocol01API {
     /**
@@ -37,7 +38,7 @@ object DailyProtocol01API {
 
         val response = PoliClient.client.post("poli/day/protocol1") {
             setBody(requestBody)
-        }.call.attributes[AttributeKey("body")].toString().toBaseResponse()
+        }.call.attributes[AttributeKey("body")].toString().toProtocol1Response(ltmModel)
 
         return response
     }
