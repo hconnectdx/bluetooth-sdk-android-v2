@@ -6,10 +6,10 @@ import androidx.annotation.RequiresApi
 import kr.co.hconnect.polihealth_sdk_android.DateUtil
 import kr.co.hconnect.polihealth_sdk_android.api.daily.DailyProtocol01API
 import kr.co.hconnect.polihealth_sdk_android.api.daily.DailyProtocol03API
-import kr.co.hconnect.polihealth_sdk_android.api.dto.request.HRSpO2
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.BaseResponse
 import kr.co.hconnect.polihealth_sdk_android_app.api.dto.request.LTMModel
 import kr.co.hconnect.polihealth_sdk_android_app.api.sleep.DailyProtocol02API
+import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Protocol2Response
 
 class DailyApiService {

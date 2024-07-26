@@ -8,12 +8,11 @@ import io.ktor.util.AttributeKey
 import kotlinx.coroutines.runBlocking
 import kr.co.hconnect.polihealth_sdk_android.DateUtil
 import kr.co.hconnect.polihealth_sdk_android.PoliClient
-import kr.co.hconnect.polihealth_sdk_android.api.dto.request.HRSpO2
 import kr.co.hconnect.polihealth_sdk_android.api.dto.request.HRSpO2Request
 import kr.co.hconnect.polihealth_sdk_android.api.dto.request.LTMRequest
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.BaseResponse
-import kr.co.hconnect.polihealth_sdk_android.api.dto.response.toBaseResponse
 import kr.co.hconnect.polihealth_sdk_android_app.api.dto.request.LTMModel
+import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.toProtocol1Response
 
 object DailyProtocol01API {
@@ -41,31 +40,6 @@ object DailyProtocol01API {
         }.call.attributes[AttributeKey("body")].toString().toProtocol1Response(ltmModel)
 
         return response
-    }
-
-
-    @RequiresApi(Build.VERSION_CODES.Q)
-    fun testPost(
-        hrSpO2: HRSpO2
-    ) = runBlocking {
-        try {
-            val requestBody = HRSpO2Request(
-                reqDate = "20240704054513",
-                userSno = PoliClient.userSno,
-                data = HRSpO2Request.Data(
-                    oxygenVal = hrSpO2.spo2,
-                    heartRateVal = hrSpO2.heartRate
-                )
-            )
-
-            PoliClient.client.post("poli/day/protocol1") {
-                setBody(requestBody)
-            }.call.attributes[AttributeKey("body")].toString()
-
-
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
     }
 
     fun parseLTMData(data: ByteArray): LTMModel {
