@@ -11,6 +11,7 @@ import kr.co.hconnect.polihealth_sdk_android_app.api.dto.request.LTMModel
 import kr.co.hconnect.polihealth_sdk_android_app.api.sleep.DailyProtocol02API
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily2Response
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily3Response
 
 class DailyApiService {
     private val TAG = "DailyApiService"
@@ -56,8 +57,8 @@ class DailyApiService {
      * @param hrSpo2
      * @return SleepCommResponse
      */
-    suspend fun sendProtocol03(hrSpo2: HRSpO2): BaseResponse {
-        val response: BaseResponse = DailyProtocol03API.requestPost(
+    suspend fun sendProtocol03(hrSpo2: HRSpO2): Daily3Response {
+        val response: Daily3Response = DailyProtocol03API.requestPost(
             DateUtil.getCurrentDateTime(),
             hrSpo2
         )

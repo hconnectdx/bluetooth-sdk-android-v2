@@ -10,6 +10,7 @@ import kr.co.hconnect.polihealth_sdk_android.PoliClient
 import kr.co.hconnect.polihealth_sdk_android.api.dto.request.HRSpO2Request
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.BaseResponse
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily3Response
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.toDaily3Response
 
 object DailyProtocol03API {
@@ -22,7 +23,7 @@ object DailyProtocol03API {
     suspend fun requestPost(
         reqDate: String,
         hrSpO2: HRSpO2
-    ): BaseResponse {
+    ): Daily3Response {
 
         val requestBody = HRSpO2Request(
             reqDate = reqDate,
