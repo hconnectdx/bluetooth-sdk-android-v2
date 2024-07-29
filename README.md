@@ -127,8 +127,5 @@ private fun connectToDevice(device: BluetoothDevice) {
 }
 ```
 
-## 라이선스
-이 프로젝트는 MIT 라이선스 하에 배포됩니다. 자세한 내용은 [LICENSE](LICENSE)를 참조하세요.
-
 ## 문의
 문의 사항이 있으시면 [이메일](kmwdev@hconnect.co.kr)로 연락해 주세요.
