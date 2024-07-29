@@ -17,7 +17,7 @@ data class LTMModel(
     @Serializable
     data class SkinTemp(
         val time: String,
-        val skinTemp: Int
+        val skinTemp: Float
     )
 
     @Serializable

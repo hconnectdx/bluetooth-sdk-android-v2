@@ -8,6 +8,7 @@ import kr.co.hconnect.polihealth_sdk_android.PoliClient
 import kr.co.hconnect.polihealth_sdk_android.api.dto.request.LTMRequest
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.BaseResponse
 import kr.co.hconnect.polihealth_sdk_android_app.api.dto.request.LTMModel
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily1Response
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.toDaily1Response
 
 object DailyProtocol01API {
@@ -22,7 +23,7 @@ object DailyProtocol01API {
     suspend fun requestPost(
         reqDate: String,
         ltmModel: LTMModel
-    ): BaseResponse {
+    ): Daily1Response {
 
         val requestBody = LTMRequest(
             reqDate = reqDate,
@@ -56,7 +57,7 @@ object DailyProtocol01API {
             for (j in 0 until 5) {
                 val metsTime = DateUtil.getCurrentDateTime(minusMin = metLoopCnt)
                 val metsValue =
-                    ((data[offset + 2 * j].toInt() shl 8) or (data[offset + 2 * j + 1].toInt() and 0xFF)).toShort()
+                    ((data[offset + 2 * j].toInt() and 0xFF shl 8) or (data[offset + 2 * j + 1].toInt() and 0xFF)).toShort()
                         .toInt()
                 metsList.add(LTMModel.Mets(metsTime, metsValue)) // metLoopCnt 분씩 감소 해야함.
                 metLoopCnt += 1
@@ -64,14 +65,20 @@ object DailyProtocol01API {
 
             // Temp 데이터 추출 (4Bytes)
             val tempValue =
-                ((data[offset + 10].toInt() shl 24) or (data[offset + 11].toInt() and 0xFF shl 16) or (data[offset + 12].toInt() and 0xFF shl 8) or (data[offset + 13].toInt() and 0xFF))
+                ((data[offset + 10].toInt() and 0xFF shl 24) or (data[offset + 11].toInt() and 0xFF shl 16) or (data[offset + 12].toInt() and 0xFF shl 8) or (data[offset + 13].toInt() and 0xFF))
+
             val tempTime = DateUtil.getCurrentDateTime(minusMin = i * 5L)
-            skinTempList.add(LTMModel.SkinTemp(tempTime, tempValue)) // i*5 분씩 감소 해야 함.
+            skinTempList.add(
+                LTMModel.SkinTemp(
+                    tempTime,
+                    Float.fromBits(tempValue)
+                )
+            ) // i*5 분씩 감소 해야 함.
 
             // Lux 데이터 추출 (2Bytes)
             val luxValue =
-                ((data[offset + 14].toInt() shl 8) or (data[offset + 15].toInt() and 0xFF)).toShort()
-                    .toInt()
+                (data[offset + 14].toInt() and 0xFF shl 8) or (data[offset + 15].toInt() and 0xFF)
+
             val luxTime = DateUtil.getCurrentDateTime(minusMin = i * 5L)
             luxList.add(LTMModel.Lux(luxTime, luxValue))
 

@@ -23,6 +23,7 @@ import kr.co.hconnect.polihealth_sdk_android.service.sleep.SleepApiService
 import kr.co.hconnect.polihealth_sdk_android_app.api.sleep.DailyProtocol02API
 import kr.co.hconnect.polihealth_sdk_android_app.service.sleep.DailyApiService
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily1Response
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.SleepResponse
 
 object PoliBLE {
@@ -40,6 +41,9 @@ object PoliBLE {
     fun stopScan() {
         HCBle.scanStop()
     }
+
+    private var expectedByte: Byte = 0x00
+    private var protocol2Count = 0
 
     @RequiresApi(Build.VERSION_CODES.Q)
     fun connectDevice(
@@ -73,7 +77,7 @@ object PoliBLE {
                         0x01.toByte() -> {
                             CoroutineScope(Dispatchers.IO).launch {
                                 val parsedData = DailyProtocol01API.parseLTMData(it)
-                                val response: BaseResponse = DailyProtocol01API.requestPost(
+                                val response: Daily1Response = DailyProtocol01API.requestPost(
                                     DateUtil.getCurrentDateTime(),
                                     parsedData
                                 )
@@ -82,12 +86,14 @@ object PoliBLE {
                         }
 
                         0x02.toByte() -> {
+                            checkProtocol2Validate(it[1])
                             DailyProtocol02API.addByte(removeFrontTwoBytes(it, 2))
                         }
 
                         0x03.toByte() -> {
                             CoroutineScope(Dispatchers.IO).launch {
-
+                                protocol2Count = 0
+                                expectedByte = 0x00
                                 val deferProtocol02 = async {
                                     DailyApiService().sendProtocol02(context)
                                 }
@@ -194,6 +200,23 @@ object PoliBLE {
                 }
             }
         )
+    }
+
+    private fun checkProtocol2Validate(it: Byte) {
+        if (it != expectedByte) {
+            Log.e(
+                "DataLogger",
+                "데이터 손실 감지: 예상 값 ${
+                    String.format(
+                        "0x%02X",
+                        expectedByte
+                    )
+                } 실제 값 ${String.format("0x%02X", it)}"
+            )
+        }
+        expectedByte =
+            if (it == 0xFF.toByte()) 0x00 else (it + 1).toByte()
+        Log.d("Protocol2 Count", "Count: ${++protocol2Count}")
     }
 
 
