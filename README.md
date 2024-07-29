@@ -1,5 +1,5 @@
 
-# PoliHealth SDK for Android
+# PoliHealth SDK for Android (Kotlin 1.6.21 하위 호환 버전)
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
