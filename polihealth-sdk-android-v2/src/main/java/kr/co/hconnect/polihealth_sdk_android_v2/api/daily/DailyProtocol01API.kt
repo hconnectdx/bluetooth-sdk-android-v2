@@ -6,7 +6,6 @@ import io.ktor.util.AttributeKey
 import kr.co.hconnect.polihealth_sdk_android.DateUtil
 import kr.co.hconnect.polihealth_sdk_android.PoliClient
 import kr.co.hconnect.polihealth_sdk_android.api.dto.request.LTMRequest
-import kr.co.hconnect.polihealth_sdk_android.api.dto.response.BaseResponse
 import kr.co.hconnect.polihealth_sdk_android_app.api.dto.request.LTMModel
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily1Response
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.toDaily1Response
@@ -55,11 +54,11 @@ object DailyProtocol01API {
 
             // METs 데이터 추출 (2Bytes * 5EA)
             for (j in 0 until 5) {
-                val metsTime = DateUtil.getCurrentDateTime(minusMin = metLoopCnt)
+                val metsTime = DateUtil.getCurrentDateTimeHHMMSS(minusMin = metLoopCnt)
                 val metsValue =
                     ((data[offset + 2 * j].toInt() and 0xFF shl 8) or (data[offset + 2 * j + 1].toInt() and 0xFF)).toShort()
                         .toInt()
-                metsList.add(LTMModel.Mets(metsTime, metsValue)) // metLoopCnt 분씩 감소 해야함.
+                metsList.add(LTMModel.Mets(metsTime, metsValue / 1000)) // metLoopCnt 분씩 감소 해야함.
                 metLoopCnt += 1
             }
 

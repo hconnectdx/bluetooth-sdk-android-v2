@@ -13,7 +13,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kr.co.hconnect.bluetooth_sdk_android.HCBle
 import kr.co.hconnect.polihealth_sdk_android.api.daily.DailyProtocol01API
-import kr.co.hconnect.polihealth_sdk_android.api.dto.response.BaseResponse
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.PoliResponse
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.SleepEndResponse
 import kr.co.hconnect.polihealth_sdk_android.api.sleep.SleepProtocol06API
@@ -78,7 +77,7 @@ object PoliBLE {
                             CoroutineScope(Dispatchers.IO).launch {
                                 val parsedData = DailyProtocol01API.parseLTMData(it)
                                 val response: Daily1Response = DailyProtocol01API.requestPost(
-                                    DateUtil.getCurrentDateTime(),
+                                    DateUtil.getCurrentDateTimeHHMMSS(),
                                     parsedData
                                 )
                                 onReceive.invoke(ProtocolType.PROTOCOL_1, response)
