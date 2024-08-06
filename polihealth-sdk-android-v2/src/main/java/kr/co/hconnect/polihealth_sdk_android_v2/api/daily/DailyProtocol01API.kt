@@ -54,7 +54,7 @@ object DailyProtocol01API {
 
             // METs 데이터 추출 (2Bytes * 5EA)
             for (j in 0 until 5) {
-                val metsTime = DateUtil.getCurrentDateTimeHHMMSS(minusMin = metLoopCnt)
+                val metsTime = DateUtil.getCurrentDateTime(minusMin = metLoopCnt)
                 val metsValue =
                     ((data[offset + 2 * j].toInt() and 0xFF shl 8) or (data[offset + 2 * j + 1].toInt() and 0xFF)).toShort()
                         .toInt()

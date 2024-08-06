@@ -77,7 +77,7 @@ object PoliBLE {
                             CoroutineScope(Dispatchers.IO).launch {
                                 val parsedData = DailyProtocol01API.parseLTMData(it)
                                 val response: Daily1Response = DailyProtocol01API.requestPost(
-                                    DateUtil.getCurrentDateTimeHHMMSS(),
+                                    DateUtil.getCurrentDateTime(),
                                     parsedData
                                 )
                                 onReceive.invoke(ProtocolType.PROTOCOL_1, response)

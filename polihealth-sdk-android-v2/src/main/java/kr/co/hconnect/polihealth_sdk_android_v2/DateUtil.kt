@@ -19,16 +19,4 @@ object DateUtil {
             formatter.format(current)
         }
     }
-
-    fun getCurrentDateTimeHHMMSS(plusMin: Long = 0, minusMin: Long = 0): String {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val current = LocalDateTime.now().minusMinutes(minusMin).plusMinutes(plusMin)
-            val formatter = DateTimeFormatter.ofPattern("HHmmss")
-            current.format(formatter)
-        } else {
-            val current = Calendar.getInstance().time
-            val formatter = SimpleDateFormat("HHmmss", Locale.getDefault())
-            formatter.format(current)
-        }
-    }
 }
