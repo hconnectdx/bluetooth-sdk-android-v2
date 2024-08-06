@@ -10,10 +10,13 @@ import android.widget.Button
 import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kr.co.hconnect.bluetooth_sdk_android_v2.service.BleService
+import kr.co.hconnect.bluetooth_sdk_android_v2.service.BleServiceInterface
 import kr.co.hconnect.polihealth_sdk_android.PoliBLE
 import kr.co.hconnect.polihealth_sdk_android.PoliClient
 import kr.co.hconnect.polihealth_sdk_android.api.daily.DailyProtocol01API
@@ -105,6 +108,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.Q)
     private fun setBtnProtocolTest() {
         val btnTest1: Button = findViewById(R.id.btn_test1)
         btnTest1.setOnClickListener {
@@ -217,6 +221,14 @@ class MainActivity : AppCompatActivity() {
                     Log.e("MainActivity", "error: $e")
                 }
             }
+        }
+
+        val btnTestService: Button = findViewById(R.id.btn_service)
+        btnTestService.setOnClickListener {
+            val intent = Intent(this, BleService::class.java).apply {
+
+            }
+            startService(intent)
         }
     }
 

@@ -41,6 +41,8 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     implementation(libs.kotlinx.coroutines.core)
+    implementation("androidx.work:work-runtime:2.7.1")
+
 }
 
 val projectProps = Properties()
