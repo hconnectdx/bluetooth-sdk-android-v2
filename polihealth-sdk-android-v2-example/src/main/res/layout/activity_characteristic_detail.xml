@@ -20,4 +20,37 @@
         android:layout_height="wrap_content"
         android:text="Notify" />
 
+    <Button
+        android:id="@+id/btn_write_call"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_columnWeight="1"
+        android:padding="5dp"
+        android:text="전화" />
+
+    <Button
+        android:id="@+id/btn_write_sms"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_columnWeight="1"
+        android:padding="5dp"
+        android:text="문자" />
+
+    <Button
+        android:id="@+id/btn_write_call_empty"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_columnWeight="1"
+        android:padding="5dp"
+        android:text="부재중" />
+
+    <Button
+        android:id="@+id/btn_write_kakao"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_columnWeight="1"
+        android:padding="5dp"
+        android:text="카카오" />
+
+
 </LinearLayout>

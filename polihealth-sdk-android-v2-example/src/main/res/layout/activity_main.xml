@@ -92,6 +92,7 @@
             android:layout_columnWeight="1"
             android:padding="5dp"
             android:text="서비스 호출" />
+
     </GridLayout>
 
     <TextView
