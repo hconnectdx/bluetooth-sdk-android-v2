@@ -135,7 +135,10 @@ object HCBle {
         onGattServiceState: (state: Int) -> Unit,
         onBondState: (state: Int) -> Unit,
         onSubscriptionState: (state: Boolean) -> Unit,
-        onReceive: (characteristic: BluetoothGattCharacteristic) -> Unit
+        onReceive: (characteristic: BluetoothGattCharacteristic) -> Unit,
+        useBondingChangeState: Boolean = true,
+        onWriteCharacteristic: ((status: Int) -> Unit)? = null,
+        onReadCharacteristic: ((status: Int) -> Unit)? = null
     ) {
         onBondState.invoke(device.bondState)
         val bondStateReceiver = object : BroadcastReceiver() {
@@ -149,11 +152,13 @@ object HCBle {
                 }
             }
         }
-        appContext.registerReceiver(
-            bondStateReceiver,
-            IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
-        )
 
+        if (useBondingChangeState) {
+            appContext.registerReceiver(
+                bondStateReceiver,
+                IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+            )
+        }
 
         bluetoothGatt = device.connectGatt(appContext, true, object : BluetoothGattCallback() {
             @SuppressLint("MissingPermission")
@@ -202,7 +207,7 @@ object HCBle {
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     Log.d(TAG_GATT_SERVICE, "onCharacteristicWrite: $status")
                 }
-                onGattServiceState.invoke(status)
+                onWriteCharacteristic?.invoke(status)
             }
 
             @Deprecated("Deprecated in Java")
@@ -215,7 +220,7 @@ object HCBle {
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     Log.d(TAG_GATT_SERVICE, "onCharacteristicRead: $status")
                 }
-                onGattServiceState.invoke(status)
+                onReadCharacteristic?.invoke(status)
             }
 
             @Deprecated("Deprecated in Java")
