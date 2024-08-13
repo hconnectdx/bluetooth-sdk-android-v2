@@ -40,7 +40,6 @@ object HCBle {
     private lateinit var bluetoothGatt: BluetoothGatt
 
     private var scanning = false
-    private val handler = Handler()
     private lateinit var scanHandler: BleScanHandler
 
     private lateinit var gattService: GATTService
@@ -131,23 +130,23 @@ object HCBle {
      */
     fun connectToDevice(
         device: BluetoothDevice,
-        onConnState: (state: Int) -> Unit,
-        onGattServiceState: (state: Int) -> Unit,
-        onBondState: (state: Int) -> Unit,
-        onSubscriptionState: (state: Boolean) -> Unit,
-        onReceive: (characteristic: BluetoothGattCharacteristic) -> Unit,
-        useBondingChangeState: Boolean = true,
+        onConnState: ((state: Int) -> Unit)? = null,
+        onBondState: ((state: Int) -> Unit)? = null,
+        onGattServiceState: ((state: Int) -> Unit)? = null,
+        onReadCharacteristic: ((status: Int) -> Unit)? = null,
         onWriteCharacteristic: ((status: Int) -> Unit)? = null,
-        onReadCharacteristic: ((status: Int) -> Unit)? = null
+        onSubscriptionState: ((state: Boolean) -> Unit)? = null,
+        onReceive: ((characteristic: BluetoothGattCharacteristic) -> Unit)? = null,
+        useBondingChangeState: Boolean = true
     ) {
-        onBondState.invoke(device.bondState)
+        onBondState?.invoke(device.bondState)
         val bondStateReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 val action = intent.action
                 if (BluetoothDevice.ACTION_BOND_STATE_CHANGED == action) {
                     val bondState =
                         intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.ERROR)
-                    onBondState.invoke(bondState)
+                    onBondState?.invoke(bondState)
                     BLEState.BOND_BONDED
                 }
             }
@@ -176,7 +175,7 @@ object HCBle {
                 } else {
                     Log.d(TAG_GATT_SERVICE, "${newState}321312")
                 }
-                onConnState.invoke(newState)
+                onConnState?.invoke(newState)
             }
 
             override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
@@ -194,7 +193,7 @@ object HCBle {
                 } else {
                     Log.w(TAG_GATT_SERVICE, "onServicesDiscovered received: $status")
                 }
-                onGattServiceState.invoke(status)
+                onGattServiceState?.invoke(status)
 
             }
 
@@ -230,7 +229,7 @@ object HCBle {
             ) {
                 super.onCharacteristicChanged(gatt, characteristic)
                 Log.d(TAG_GATT_SERVICE, "onCharacteristicChanged: ${characteristic?.value}")
-                onReceive.invoke(characteristic!!)
+                onReceive?.invoke(characteristic!!)
             }
 
             override fun onDescriptorWrite(
@@ -239,7 +238,7 @@ object HCBle {
                 status: Int
             ) {
                 super.onDescriptorWrite(gatt, descriptor, status)
-                onSubscriptionState.invoke(status == BluetoothGatt.GATT_SUCCESS)
+                onSubscriptionState?.invoke(status == BluetoothGatt.GATT_SUCCESS)
             }
 
         })
