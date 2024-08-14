@@ -111,6 +111,13 @@ object HCBle {
         }
     }
 
+    fun isConnect(device: BluetoothDevice): Boolean {
+        return bluetoothManager.getConnectionState(
+            device,
+            BluetoothProfile.GATT
+        ) == BluetoothProfile.STATE_CONNECTED
+    }
+
     fun getSelService(): BluetoothGattService {
         return gattService.selService
     }
