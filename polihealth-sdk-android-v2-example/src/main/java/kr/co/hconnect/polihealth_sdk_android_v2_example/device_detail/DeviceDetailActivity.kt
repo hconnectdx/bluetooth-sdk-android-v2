@@ -48,6 +48,7 @@ class DeviceDetailActivity : AppCompatActivity() {
         tvStatus = findViewById(R.id.tv_status)
         tvDeviceName = findViewById(R.id.tv_device_name)
         val btnConnect: Button = findViewById(R.id.btn_connect)
+        val btnDisconnect: Button = findViewById(R.id.btn_disconnect)
 
         // Display device name
         device?.let {
@@ -60,6 +61,11 @@ class DeviceDetailActivity : AppCompatActivity() {
             device?.let {
                 connectToDevice(it)
             }
+        }
+
+        btnDisconnect.setOnClickListener {
+            PoliBLE.disconnectDevice()
+            tvStatus.text = "Status: Disconnected"
         }
     }
 

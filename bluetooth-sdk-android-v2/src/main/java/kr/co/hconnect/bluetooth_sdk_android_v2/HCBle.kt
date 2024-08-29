@@ -335,5 +335,8 @@ object HCBle {
         return bluetoothAdapter.bondedDevices.toList()
     }
 
+    fun getDevice(address: String): BluetoothDevice {
+        return bluetoothAdapter.getRemoteDevice(address)
+    }
 
 }
