@@ -126,20 +126,33 @@ object PoliBLE {
 
                         0x06.toByte() -> {
                             SleepProtocol06API.addByte(removeFrontTwoBytes(it, 2))
+
+                            if (it[1] == 0xFF.toByte()) {
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    val response = SleepApiService().sendProtocol06(context)
+                                    response?.let {
+                                        onReceive.invoke(
+                                            ProtocolType.PROTOCOL_6,
+                                            response
+                                        )
+                                    }
+                                }
+                            }
                         }
 
                         0x07.toByte() -> {
-                            CoroutineScope(Dispatchers.IO).launch {
-                                val response: SleepResponse? =
-                                    SleepApiService().sendProtocol08(context)
-                                response?.let {
-                                    onReceive.invoke(
-                                        ProtocolType.PROTOCOL_8,
-                                        response
-                                    )
-                                }
+                            SleepProtocol07API.addByte(removeFrontTwoBytes(it, 2))
 
-                                SleepProtocol07API.addByte(removeFrontTwoBytes(it, 2))
+                            if (it[1] == 0xFF.toByte()) {
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    val response = SleepApiService().sendProtocol07(context)
+                                    response?.let {
+                                        onReceive.invoke(
+                                            ProtocolType.PROTOCOL_7,
+                                            response
+                                        )
+                                    }
+                                }
                             }
                         }
 
@@ -157,31 +170,22 @@ object PoliBLE {
                                         )
                                     }
                                 }
-                                SleepProtocol08API.addByte(removeFrontTwoBytes(it, 2))
                             }
                         }
 
                         0x09.toByte() -> {
+                            val hrSpO2: HRSpO2 =
+                                HRSpO2Parser.asciiToHRSpO2(removeFrontTwoBytes(it, 1))
+
                             CoroutineScope(Dispatchers.IO).launch {
-                                val deferProtocol07 = async {
-                                    SleepApiService().sendProtocol07(context)
+                                val response = SleepApiService().sendProtocol09(hrSpO2)
+                                response.let {
+                                    onReceive.invoke(
+                                        ProtocolType.PROTOCOL_9_HR_SpO2,
+                                        response
+                                    )
                                 }
-                                val hrSpO2: HRSpO2 =
-                                    HRSpO2Parser.asciiToHRSpO2(removeFrontTwoBytes(it, 1))
-                                val deferProtocol09 = async {
-                                    SleepApiService().sendProtocol09(hrSpO2)
-                                }
-
-                                val responseProtocol07 = deferProtocol07.await()
-                                onReceive.invoke(ProtocolType.PROTOCOL_7, responseProtocol07)
-
-                                val responseProtocol09 = deferProtocol09.await()
-                                onReceive.invoke(
-                                    ProtocolType.PROTOCOL_9_HR_SpO2,
-                                    responseProtocol09
-                                )
                             }
-
                         }
 
                         else -> {
