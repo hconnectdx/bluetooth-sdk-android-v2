@@ -75,11 +75,10 @@ object PoliBLE {
                     when (it[0]) {
                         0x01.toByte() -> {
                             CoroutineScope(Dispatchers.IO).launch {
-                                val parsedData = DailyProtocol01API.parseLTMData(it)
-                                val response: Daily1Response = DailyProtocol01API.requestPost(
-                                    DateUtil.getCurrentDateTime(),
-                                    parsedData
-                                )
+                                val parsedData = DailyProtocol01API.parseLTMData(it, context)
+
+                                val response: Daily1Response =
+                                    DailyApiService().sendProtocol01(parsedData)
                                 onReceive.invoke(ProtocolType.PROTOCOL_1, response)
                             }
                         }
@@ -87,28 +86,26 @@ object PoliBLE {
                         0x02.toByte() -> {
                             checkProtocol2Validate(it[1])
                             DailyProtocol02API.addByte(removeFrontTwoBytes(it, 2))
+
+                            if (it[1] == 0xFF.toByte()) {
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    val response = DailyApiService().sendProtocol02(context)
+                                    onReceive.invoke(ProtocolType.PROTOCOL_2, response)
+
+                                    protocol2Count = 0
+                                    expectedByte = 0x00
+                                }
+                            }
                         }
 
                         0x03.toByte() -> {
                             CoroutineScope(Dispatchers.IO).launch {
-                                protocol2Count = 0
-                                expectedByte = 0x00
-                                val deferProtocol02 = async {
-                                    DailyApiService().sendProtocol02(context)
-                                }
                                 val hrSpO2: HRSpO2 =
                                     HRSpO2Parser.asciiToHRSpO2(removeFrontTwoBytes(it, 1))
-                                val deferProtocol03 = async {
-                                    DailyApiService().sendProtocol03(hrSpO2)
-                                }
-
-                                val responseProtocol02 = deferProtocol02.await()
-                                onReceive.invoke(ProtocolType.PROTOCOL_2, responseProtocol02)
-
-                                val responseProtocol03 = deferProtocol03.await()
+                                val response = DailyApiService().sendProtocol03(hrSpO2)
                                 onReceive.invoke(
                                     ProtocolType.PROTOCOL_3_HR_SpO2,
-                                    responseProtocol03
+                                    response
                                 )
                             }
                         }
@@ -147,13 +144,18 @@ object PoliBLE {
                         }
 
                         0x08.toByte() -> {
-                            CoroutineScope(Dispatchers.IO).launch {
-                                val response = SleepApiService().sendProtocol06(context)
-                                response?.let {
-                                    onReceive.invoke(
-                                        ProtocolType.PROTOCOL_6,
-                                        response
-                                    )
+                            SleepProtocol08API.addByte(removeFrontTwoBytes(it, 2))
+
+                            if (it[1] == 0xFF.toByte()) {
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    val response: SleepResponse? =
+                                        SleepApiService().sendProtocol08(context)
+                                    response?.let {
+                                        onReceive.invoke(
+                                            ProtocolType.PROTOCOL_8,
+                                            response
+                                        )
+                                    }
                                 }
                                 SleepProtocol08API.addByte(removeFrontTwoBytes(it, 2))
                             }
@@ -214,7 +216,7 @@ object PoliBLE {
             )
         }
         expectedByte =
-            if (it == 0xFF.toByte()) 0x00 else (it + 1).toByte()
+            if (it == 0xFE.toByte()) 0x00 else (it + 1).toByte()
         Log.d("Protocol2 Count", "Count: ${++protocol2Count}")
     }
 

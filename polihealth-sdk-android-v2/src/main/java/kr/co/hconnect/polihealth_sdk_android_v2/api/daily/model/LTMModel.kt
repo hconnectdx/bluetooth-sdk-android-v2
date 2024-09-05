@@ -1,6 +1,10 @@
-package kr.co.hconnect.polihealth_sdk_android_app.api.dto.request
+package kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.ExperimentalSerializationApi
+
 
 @Serializable
 data class LTMModel(
@@ -45,6 +49,20 @@ data class LTMModel(
         result = 31 * result + skinTemp.contentHashCode()
         result = 31 * result + mets.contentHashCode()
         return result
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    override fun toString(): String {
+        // lazy 키워드를 사용해 jsonFormatter를 필요할 때 한 번만 생성
+        val jsonFormatter by lazy {
+            Json {
+                prettyPrint = true // 예쁘게 출력
+                prettyPrintIndent = "  " // 들여쓰기 설정
+            }
+        }
+
+        // 객체를 Json으로 변환
+        return jsonFormatter.encodeToString(this)
     }
 }
 

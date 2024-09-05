@@ -1,7 +1,7 @@
 package kr.co.hconnect.polihealth_sdk_android.api.dto.request
 
 import kotlinx.serialization.Serializable
-import kr.co.hconnect.polihealth_sdk_android_app.api.dto.request.LTMModel
+import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.LTMModel
 
 @Serializable
 data class LTMRequest(

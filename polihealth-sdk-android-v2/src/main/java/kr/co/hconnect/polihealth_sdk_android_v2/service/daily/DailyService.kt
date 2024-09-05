@@ -6,8 +6,7 @@ import androidx.annotation.RequiresApi
 import kr.co.hconnect.polihealth_sdk_android.DateUtil
 import kr.co.hconnect.polihealth_sdk_android.api.daily.DailyProtocol01API
 import kr.co.hconnect.polihealth_sdk_android.api.daily.DailyProtocol03API
-import kr.co.hconnect.polihealth_sdk_android.api.dto.response.BaseResponse
-import kr.co.hconnect.polihealth_sdk_android_app.api.dto.request.LTMModel
+import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.LTMModel
 import kr.co.hconnect.polihealth_sdk_android_app.api.sleep.DailyProtocol02API
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily1Response
@@ -24,11 +23,10 @@ class DailyApiService {
      * @return SleepCommResponse
      */
     suspend fun sendProtocol01(ltmModel: LTMModel): Daily1Response {
-        val response: Daily1Response = DailyProtocol01API.requestPost(
+        return DailyProtocol01API.requestPost(
             DateUtil.getCurrentDateTime(),
             ltmModel
         )
-        return response
     }
 
     /**

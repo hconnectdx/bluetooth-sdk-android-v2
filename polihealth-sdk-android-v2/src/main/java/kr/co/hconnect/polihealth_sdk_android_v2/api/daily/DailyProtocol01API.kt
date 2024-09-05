@@ -1,14 +1,21 @@
 package kr.co.hconnect.polihealth_sdk_android.api.daily
 
+import android.content.ContentValues
+import android.content.Context
+import android.os.Build
+import android.provider.MediaStore
+import android.util.Log
+import androidx.annotation.RequiresApi
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.util.AttributeKey
 import kr.co.hconnect.polihealth_sdk_android.DateUtil
 import kr.co.hconnect.polihealth_sdk_android.PoliClient
 import kr.co.hconnect.polihealth_sdk_android.api.dto.request.LTMRequest
-import kr.co.hconnect.polihealth_sdk_android_app.api.dto.request.LTMModel
+import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.LTMModel
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily1Response
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.toDaily1Response
+import java.io.OutputStream
 
 object DailyProtocol01API {
     /**
@@ -37,7 +44,7 @@ object DailyProtocol01API {
         return response
     }
 
-    fun parseLTMData(data: ByteArray): LTMModel {
+    fun parseLTMData(data: ByteArray, context: Context? = null): LTMModel {
         val header = data[0]
         val dataNum = data[1]
 
@@ -91,8 +98,49 @@ object DailyProtocol01API {
             mets = metsList.toTypedArray()
         )
 
+        if (context != null) {
+            saveStringToFile(
+                context,
+                ltmModel.toString(),
+                "protocol1${DateUtil.getCurrentDateTime()}.txt"
+            )
+        } // 클론한 데이터를 파일로 저장
+
         return ltmModel
     }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun saveStringToFile(context: Context, data: String?, fileName: String) {
+        data?.let {
+            try {
+                val outputStream: OutputStream?
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                    put(MediaStore.MediaColumns.MIME_TYPE, "text/plain") // MIME type 변경
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/")
+                }
+
+                val uri = context.contentResolver.insert(
+                    MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                    contentValues
+                )
+                outputStream = uri?.let { context.contentResolver.openOutputStream(it) }
+
+                if (outputStream != null) {
+                    outputStream.write(it.toByteArray())  // String을 ByteArray로 변환하여 저장
+                    outputStream.close()
+                    Log.d("StringController", "Data saved to file: $fileName in Download folder")
+                } else {
+                    Log.e("StringController", "Failed to create OutputStream")
+                }
+            } catch (e: Exception) {
+                Log.e("StringController", "Error saving data to file", e)
+            }
+        } ?: run {
+            Log.d("StringController", "No data to save")
+        }
+    }
+
 
     val testRawData = byteArrayOf(
         0x01,
