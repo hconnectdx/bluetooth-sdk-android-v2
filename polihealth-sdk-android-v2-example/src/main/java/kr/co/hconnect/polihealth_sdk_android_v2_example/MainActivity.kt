@@ -116,7 +116,12 @@ class MainActivity : AppCompatActivity() {
                 try {
                     DailyProtocol01API.apply {
                         val response =
-                            DailyApiService().sendProtocol01(parseLTMData(data = testRawData))
+                            DailyApiService().sendProtocol01(
+                                parseLTMData(
+                                    data = testRawData,
+                                    context = this@MainActivity
+                                )
+                            )
                         Log.d("MainActivity", "response: $response")
                     }
 

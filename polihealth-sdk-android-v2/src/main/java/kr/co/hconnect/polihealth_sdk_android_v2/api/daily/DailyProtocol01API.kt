@@ -44,6 +44,7 @@ object DailyProtocol01API {
         return response
     }
 
+    @RequiresApi(Build.VERSION_CODES.Q)
     fun parseLTMData(data: ByteArray, context: Context? = null): LTMModel {
         val header = data[0]
         val dataNum = data[1]
@@ -105,7 +106,7 @@ object DailyProtocol01API {
                 "protocol1${DateUtil.getCurrentDateTime()}.txt"
             )
         } // 클론한 데이터를 파일로 저장
-
+        
         return ltmModel
     }
 
