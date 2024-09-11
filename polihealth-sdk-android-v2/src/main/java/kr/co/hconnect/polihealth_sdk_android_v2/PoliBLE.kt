@@ -77,7 +77,7 @@ object PoliBLE {
                             CoroutineScope(Dispatchers.IO).launch {
 
                                 DailyProtocol01API.categorizeData(it)
-                                
+
                                 if (it[1] == 0xFF.toByte()) {
                                     DailyProtocol01API.createLTMModel()
                                     val response: Daily1Response =
@@ -88,6 +88,10 @@ object PoliBLE {
                         }
 
                         0x02.toByte() -> {
+                            if (it[1] == 0x00.toByte()) {
+                                onReceive.invoke(ProtocolType.PROTOCOL_2_START, null)
+                            }
+                            
                             checkProtocol2Validate(it[1])
                             DailyProtocol02API.addByte(removeFrontTwoBytes(it, 2))
 
