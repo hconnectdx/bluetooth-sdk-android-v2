@@ -43,6 +43,7 @@ object PoliBLE {
 
     private var expectedByte: Byte = 0x00
     private var protocol2Count = 0
+    private var prevByte: Byte = 0x00
 
     @RequiresApi(Build.VERSION_CODES.Q)
     fun connectDevice(
@@ -88,10 +89,12 @@ object PoliBLE {
                         }
 
                         0x02.toByte() -> {
-                            if (it[1] == 0x00.toByte()) {
+                            // 이전이 0xFE일 경우 들어오지 않음 (초기에 한 번만 들어오게 하는 처리)
+                            if (prevByte != 0xFE.toByte() && it[1] == 0x00.toByte()) {
                                 onReceive.invoke(ProtocolType.PROTOCOL_2_START, null)
                             }
-                            
+                            prevByte = it[1]
+
                             checkProtocol2Validate(it[1])
                             DailyProtocol02API.addByte(removeFrontTwoBytes(it, 2))
 
