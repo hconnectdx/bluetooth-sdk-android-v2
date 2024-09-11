@@ -75,11 +75,15 @@ object PoliBLE {
                     when (it[0]) {
                         0x01.toByte() -> {
                             CoroutineScope(Dispatchers.IO).launch {
-                                val parsedData = DailyProtocol01API.parseLTMData(it, context)
 
-                                val response: Daily1Response =
-                                    DailyApiService().sendProtocol01(parsedData)
-                                onReceive.invoke(ProtocolType.PROTOCOL_1, response)
+                                DailyProtocol01API.categorizeData(it)
+                                
+                                if (it[1] == 0xFF.toByte()) {
+                                    DailyProtocol01API.createLTMModel()
+                                    val response: Daily1Response =
+                                        DailyApiService().sendProtocol01New(context)
+                                    onReceive.invoke(ProtocolType.PROTOCOL_1, response)
+                                }
                             }
                         }
 

@@ -7,6 +7,7 @@ import android.provider.MediaStore
 import android.util.Log
 import androidx.annotation.RequiresApi
 import kr.co.hconnect.polihealth_sdk_android.DateUtil
+import kr.co.hconnect.polihealth_sdk_android_v2.BuildConfig
 import java.io.OutputStream
 
 open class BaseProtocolHandler {
@@ -31,14 +32,15 @@ open class BaseProtocolHandler {
         val tempByteArray = _byteArray.clone() // 현재 _byteArray를 클론
 
         _byteArray = byteArrayOf()
-        Log.d("RepositoryProtocol06", tempByteArray.toHexString())
-        context?.let {
-            saveToFile(
-                it,
-                tempByteArray,
-                "protocol${DateUtil.getCurrentDateTime()}.bin"
-            )
-        } // 클론한 데이터를 파일로 저장
+        if (BuildConfig.DEBUG) {
+            context?.let {
+                saveToFile(
+                    it,
+                    tempByteArray,
+                    "protocol${DateUtil.getCurrentDateTime()}.bin"
+                )
+            } // 클론한 데이터를 파일로 저장
+        }
         return tempByteArray // 클론한 데이터를 반환
     }
 

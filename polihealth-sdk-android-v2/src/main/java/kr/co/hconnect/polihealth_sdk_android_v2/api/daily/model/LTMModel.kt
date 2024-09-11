@@ -14,20 +14,20 @@ data class LTMModel(
 ) {
     @Serializable
     data class Lux(
-        val time: String,
-        val lux: Int
+        val lux: Int,
+        var time: String? = null
     )
 
     @Serializable
     data class SkinTemp(
-        val time: String,
-        val skinTemp: Float
+        val skinTemp: Float,
+        var time: String? = null
     )
 
     @Serializable
     data class Mets(
-        val time: String,
-        val mets: Int
+        val mets: Int,
+        var time: String? = null
     )
 
     // 자동 생성 코드

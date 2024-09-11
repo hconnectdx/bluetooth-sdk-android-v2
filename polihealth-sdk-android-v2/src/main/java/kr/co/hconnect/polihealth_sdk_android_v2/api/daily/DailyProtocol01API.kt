@@ -18,6 +18,11 @@ import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.toDaily1Respons
 import java.io.OutputStream
 
 object DailyProtocol01API {
+    var ltmModel: LTMModel? = null
+    val lstLux = mutableListOf<LTMModel.Lux>()
+    val lstSkinTemp = mutableListOf<LTMModel.SkinTemp>()
+    val lstMets = mutableListOf<LTMModel.Mets>()
+
     /**
      * TODO: 조도값, 피부온도값, 활동량값을 서버로 전송하는 API
      *
@@ -40,6 +45,10 @@ object DailyProtocol01API {
         val response = PoliClient.client.post("poli/day/protocol1") {
             setBody(requestBody)
         }.call.attributes[AttributeKey("body")].toString().toDaily1Response(ltmModel)
+
+
+        // 다음 데이터를 위해 초기화
+        clearData()
 
         return response
     }
@@ -66,7 +75,7 @@ object DailyProtocol01API {
                 val metsValue =
                     ((data[offset + 2 * j].toInt() and 0xFF shl 8) or (data[offset + 2 * j + 1].toInt() and 0xFF)).toShort()
                         .toInt()
-                metsList.add(LTMModel.Mets(metsTime, metsValue / 1000)) // metLoopCnt 분씩 감소 해야함.
+                metsList.add(LTMModel.Mets(metsValue / 1000, metsTime)) // metLoopCnt 분씩 감소 해야함.
                 metLoopCnt += 1
             }
 
@@ -77,8 +86,8 @@ object DailyProtocol01API {
             val tempTime = DateUtil.getCurrentDateTime(minusMin = i * 5L)
             skinTempList.add(
                 LTMModel.SkinTemp(
-                    tempTime,
-                    Float.fromBits(tempValue)
+                    Float.fromBits(tempValue),
+                    tempTime
                 )
             ) // i*5 분씩 감소 해야 함.
 
@@ -87,7 +96,7 @@ object DailyProtocol01API {
                 (data[offset + 14].toInt() and 0xFF shl 8) or (data[offset + 15].toInt() and 0xFF)
 
             val luxTime = DateUtil.getCurrentDateTime(minusMin = i * 5L)
-            luxList.add(LTMModel.Lux(luxTime, luxValue))
+            luxList.add(LTMModel.Lux(luxValue, luxTime))
 
             // 오프셋 증가
             offset += sampleSize
@@ -106,12 +115,89 @@ object DailyProtocol01API {
                 "protocol1${DateUtil.getCurrentDateTime()}.txt"
             )
         } // 클론한 데이터를 파일로 저장
-        
+
         return ltmModel
     }
 
+    fun createLTMModel() {
+
+        val currentTime = DateUtil.getCurrentDateTime()
+
+        val lstLuxWithTime = lstLux.mapIndexed { index, lux ->
+            lux.time = DateUtil.adjustDateTime(currentTime, minusMin = (5 * index).toLong())
+            lux
+        }
+
+        val lstSkinWithTime = lstSkinTemp.mapIndexed { index, skinTemp ->
+            skinTemp.time = DateUtil.adjustDateTime(currentTime, minusMin = (5 * index).toLong())
+            skinTemp
+        }
+
+        val lstMetsWithTime = lstMets.mapIndexed { index, mets ->
+            mets.time = DateUtil.adjustDateTime(currentTime, minusMin = index.toLong())
+            mets
+        }
+
+        val ltmModel = LTMModel(
+            lux = lstLuxWithTime.toTypedArray(),
+            skinTemp = lstSkinWithTime.toTypedArray(),
+            mets = lstMetsWithTime.toTypedArray()
+        )
+
+        this.ltmModel = ltmModel
+    }
+
+    private fun clearData() {
+        lstLux.clear()
+        lstSkinTemp.clear()
+        lstMets.clear()
+        ltmModel = null
+    }
+
+    /**
+     * TODO: 데이터를 카테고리화하여 저장
+     * TODO: 카테고리화 된 데이터들은 계속 저장되어, 전송할때 취합하여 전송
+     * lstMets, lstSkinTemp, lstLux
+     * @param bytes
+     */
+    fun categorizeData(bytes: ByteArray) {
+        val sampleSize = 16
+        val totalSamples = 12
+        var offset = 2 // Skip header and dataNum
+
+        for (i in 0 until totalSamples) {
+
+            // METs 데이터 추출 (2Bytes * 5EA)
+            for (j in 0 until 5) {
+                val metsValue =
+                    ((bytes[offset + 2 * j].toInt() and 0xFF shl 8) or (bytes[offset + 2 * j + 1].toInt() and 0xFF)).toShort()
+                        .toInt()
+                lstMets.add(LTMModel.Mets(metsValue / 1000)) // metLoopCnt 분씩 감소 해야함.
+            }
+
+            // Temp 데이터 추출 (4Bytes)
+            val tempValue =
+                ((bytes[offset + 10].toInt() and 0xFF shl 24) or (bytes[offset + 11].toInt() and 0xFF shl 16) or (bytes[offset + 12].toInt() and 0xFF shl 8) or (bytes[offset + 13].toInt() and 0xFF))
+
+            lstSkinTemp.add(
+                LTMModel.SkinTemp(
+                    Float.fromBits(tempValue)
+                )
+            ) // i*5 분씩 감소 해야 함.
+
+            // Lux 데이터 추출 (2Bytes)
+            val luxValue =
+                (bytes[offset + 14].toInt() and 0xFF shl 8) or (bytes[offset + 15].toInt() and 0xFF)
+
+            lstLux.add(LTMModel.Lux(luxValue))
+
+            // 오프셋 증가
+            offset += sampleSize
+        }
+    }
+
     @RequiresApi(Build.VERSION_CODES.Q)
-    private fun saveStringToFile(context: Context, data: String?, fileName: String) {
+    fun saveStringToFile(context: Context, data: String?, fileName: String) {
         data?.let {
             try {
                 val outputStream: OutputStream?

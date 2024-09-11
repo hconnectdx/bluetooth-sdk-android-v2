@@ -8,6 +8,7 @@ import kr.co.hconnect.polihealth_sdk_android.api.daily.DailyProtocol01API
 import kr.co.hconnect.polihealth_sdk_android.api.daily.DailyProtocol03API
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.LTMModel
 import kr.co.hconnect.polihealth_sdk_android_app.api.sleep.DailyProtocol02API
+import kr.co.hconnect.polihealth_sdk_android_v2.BuildConfig
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily1Response
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily2Response
@@ -26,6 +27,25 @@ class DailyApiService {
         return DailyProtocol01API.requestPost(
             DateUtil.getCurrentDateTime(),
             ltmModel
+        )
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    suspend fun sendProtocol01New(context: Context? = null): Daily1Response {
+
+        if (BuildConfig.DEBUG) {
+            if (context != null) {
+                DailyProtocol01API.saveStringToFile(
+                    context,
+                    DailyProtocol01API.ltmModel.toString(),
+                    "protocol01.txt"
+                )
+            }
+        }
+
+        return DailyProtocol01API.requestPost(
+            DateUtil.getCurrentDateTime(),
+            DailyProtocol01API.ltmModel ?: LTMModel(arrayOf(), arrayOf(), arrayOf()) // 내일 바로 테스트
         )
     }
 
