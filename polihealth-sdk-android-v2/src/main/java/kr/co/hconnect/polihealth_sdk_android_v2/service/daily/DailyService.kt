@@ -33,14 +33,12 @@ class DailyApiService {
     @RequiresApi(Build.VERSION_CODES.Q)
     suspend fun sendProtocol01New(context: Context? = null): Daily1Response {
 
-        if (BuildConfig.DEBUG) {
-            if (context != null) {
-                DailyProtocol01API.saveStringToFile(
-                    context,
-                    DailyProtocol01API.ltmModel.toString(),
-                    "protocol01.txt"
-                )
-            }
+        context?.let {
+            DailyProtocol01API.saveStringToFile(
+                context,
+                DailyProtocol01API.ltmModel.toString(),
+                "protocol01.txt"
+            )
         }
 
         return DailyProtocol01API.requestPost(

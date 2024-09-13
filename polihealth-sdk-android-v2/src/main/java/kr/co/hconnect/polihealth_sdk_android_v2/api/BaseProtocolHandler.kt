@@ -32,15 +32,14 @@ open class BaseProtocolHandler {
         val tempByteArray = _byteArray.clone() // 현재 _byteArray를 클론
 
         _byteArray = byteArrayOf()
-        if (BuildConfig.DEBUG) {
-            context?.let {
-                saveToFile(
-                    it,
-                    tempByteArray,
-                    "protocol${DateUtil.getCurrentDateTime()}.bin"
-                )
-            } // 클론한 데이터를 파일로 저장
-        }
+        context?.let {
+            saveToFile(
+                it,
+                tempByteArray,
+                "protocol ${DateUtil.getCurrentDateTime()}.bin"
+            )
+        } // 클론한 데이터를 파일로 저장
+
         return tempByteArray // 클론한 데이터를 반환
     }
 
