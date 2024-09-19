@@ -71,77 +71,104 @@ object PoliBLE {
             },
             onReceive = { characteristic ->
                 val byteArray = characteristic.value ?: ByteArray(0)
-                try {
-                    byteArray.let {
+                byteArray.let {
 
-                        when (it[0]) {
-                            0x01.toByte() -> {
-                                CoroutineScope(Dispatchers.IO).launch {
+                    when (it[0]) {
+                        0x01.toByte() -> {
+                            CoroutineScope(Dispatchers.IO).launch {
 
-                                    DailyProtocol01API.categorizeData(it)
+                                DailyProtocol01API.categorizeData(it)
 
-                                    if (it[1] == 0xFF.toByte()) {
-                                        DailyProtocol01API.createLTMModel()
+                                if (it[1] == 0xFF.toByte()) {
+                                    DailyProtocol01API.createLTMModel()
+                                    try {
                                         val response: Daily1Response =
                                             DailyApiService().sendProtocol01New(context)
                                         onReceive.invoke(ProtocolType.PROTOCOL_1, response)
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
                                     }
                                 }
                             }
+                        }
 
-                            0x02.toByte() -> {
-                                // 이전이 0xFE일 경우 들어오지 않음 (초기에 한 번만 들어오게 하는 처리)
-                                if (prevByte != 0xFE.toByte() && it[1] == 0x00.toByte()) {
-                                    onReceive.invoke(ProtocolType.PROTOCOL_2_START, null)
-                                }
-                                prevByte = it[1]
+                        0x02.toByte() -> {
+                            // 이전이 0xFE일 경우 들어오지 않음 (초기에 한 번만 들어오게 하는 처리)
+                            if (prevByte != 0xFE.toByte() && it[1] == 0x00.toByte()) {
+                                onReceive.invoke(ProtocolType.PROTOCOL_2_START, null)
+                            }
+                            prevByte = it[1]
 
-                                checkProtocol2Validate(it[1])
-                                DailyProtocol02API.addByte(removeFrontTwoBytes(it, 2))
+                            checkProtocol2Validate(it[1])
+                            DailyProtocol02API.addByte(removeFrontTwoBytes(it, 2))
 
-                                if (it[1] == 0xFF.toByte()) {
-                                    CoroutineScope(Dispatchers.IO).launch {
+                            if (it[1] == 0xFF.toByte()) {
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    try {
                                         val response = DailyApiService().sendProtocol02(context)
                                         onReceive.invoke(ProtocolType.PROTOCOL_2, response)
 
                                         protocol2Count = 0
                                         expectedByte = 0x00
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
                                     }
                                 }
                             }
+                        }
 
-                            0x03.toByte() -> {
-                                CoroutineScope(Dispatchers.IO).launch {
-                                    val hrSpO2: HRSpO2 =
-                                        HRSpO2Parser.asciiToHRSpO2(removeFrontTwoBytes(it, 1))
+                        0x03.toByte() -> {
+                            CoroutineScope(Dispatchers.IO).launch {
+                                val hrSpO2: HRSpO2 =
+                                    HRSpO2Parser.asciiToHRSpO2(removeFrontTwoBytes(it, 1))
+                                try {
                                     val response = DailyApiService().sendProtocol03(hrSpO2)
                                     onReceive.invoke(
                                         ProtocolType.PROTOCOL_3_HR_SpO2,
                                         response
                                     )
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
                                 }
                             }
+                        }
 
-                            0x04.toByte() -> {
-                                CoroutineScope(Dispatchers.IO).launch {
-                                    val response: SleepResponse = SleepApiService().sendStartSleep()
-                                    onReceive.invoke(ProtocolType.PROTOCOL_4_SLEEP_START, response)
+                        0x04.toByte() -> {
+                            CoroutineScope(Dispatchers.IO).launch {
+                                try {
+                                    val response: SleepResponse =
+                                        SleepApiService().sendStartSleep()
+                                    onReceive.invoke(
+                                        ProtocolType.PROTOCOL_4_SLEEP_START,
+                                        response
+                                    )
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
                                 }
                             }
+                        }
 
-                            0x05.toByte() -> {
-                                CoroutineScope(Dispatchers.IO).launch {
+                        0x05.toByte() -> {
+                            CoroutineScope(Dispatchers.IO).launch {
+                                try {
                                     val response: SleepEndResponse =
                                         SleepApiService().sendEndSleep()
-                                    onReceive.invoke(ProtocolType.PROTOCOL_5_SLEEP_END, response)
+                                    onReceive.invoke(
+                                        ProtocolType.PROTOCOL_5_SLEEP_END,
+                                        response
+                                    )
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
                                 }
                             }
+                        }
 
-                            0x06.toByte() -> {
-                                SleepProtocol06API.addByte(removeFrontTwoBytes(it, 2))
+                        0x06.toByte() -> {
+                            SleepProtocol06API.addByte(removeFrontTwoBytes(it, 2))
 
-                                if (it[1] == 0xFF.toByte()) {
-                                    CoroutineScope(Dispatchers.IO).launch {
+                            if (it[1] == 0xFF.toByte()) {
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    try {
                                         val response = SleepApiService().sendProtocol06(context)
                                         response?.let {
                                             onReceive.invoke(
@@ -149,15 +176,19 @@ object PoliBLE {
                                                 response
                                             )
                                         }
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
                                     }
                                 }
                             }
+                        }
 
-                            0x07.toByte() -> {
-                                SleepProtocol07API.addByte(removeFrontTwoBytes(it, 2))
+                        0x07.toByte() -> {
+                            SleepProtocol07API.addByte(removeFrontTwoBytes(it, 2))
 
-                                if (it[1] == 0xFF.toByte()) {
-                                    CoroutineScope(Dispatchers.IO).launch {
+                            if (it[1] == 0xFF.toByte()) {
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    try {
                                         val response = SleepApiService().sendProtocol07(context)
                                         response?.let {
                                             onReceive.invoke(
@@ -165,15 +196,19 @@ object PoliBLE {
                                                 response
                                             )
                                         }
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
                                     }
                                 }
                             }
+                        }
 
-                            0x08.toByte() -> {
-                                SleepProtocol08API.addByte(removeFrontTwoBytes(it, 2))
+                        0x08.toByte() -> {
+                            SleepProtocol08API.addByte(removeFrontTwoBytes(it, 2))
 
-                                if (it[1] == 0xFF.toByte()) {
-                                    CoroutineScope(Dispatchers.IO).launch {
+                            if (it[1] == 0xFF.toByte()) {
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    try {
                                         val response: SleepResponse? =
                                             SleepApiService().sendProtocol08(context)
                                         response?.let {
@@ -182,15 +217,19 @@ object PoliBLE {
                                                 response
                                             )
                                         }
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
                                     }
                                 }
                             }
+                        }
 
-                            0x09.toByte() -> {
-                                val hrSpO2: HRSpO2 =
-                                    HRSpO2Parser.asciiToHRSpO2(removeFrontTwoBytes(it, 1))
+                        0x09.toByte() -> {
+                            val hrSpO2: HRSpO2 =
+                                HRSpO2Parser.asciiToHRSpO2(removeFrontTwoBytes(it, 1))
 
-                                CoroutineScope(Dispatchers.IO).launch {
+                            CoroutineScope(Dispatchers.IO).launch {
+                                try {
                                     val response = SleepApiService().sendProtocol09(hrSpO2)
                                     response.let {
                                         onReceive.invoke(
@@ -198,27 +237,28 @@ object PoliBLE {
                                             response
                                         )
                                     }
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
                                 }
                             }
-
-                            else -> {
-                                Log.e(TAG, "Unknown Protocol: ${
-                                    byteArray.joinToString(separator = " ") { byte ->
-                                        "%02x".format(
-                                            byte
-                                        )
-                                    }
-                                }"
-                                )
-                            }
                         }
-                        val hexString =
-                            byteArray.joinToString(separator = " ") { byte -> "%02x".format(byte) }
-                        Log.d("GATTService", "onCharacteristicChanged: $hexString")
+
+                        else -> {
+                            Log.e(TAG, "Unknown Protocol: ${
+                                byteArray.joinToString(separator = " ") { byte ->
+                                    "%02x".format(
+                                        byte
+                                    )
+                                }
+                            }"
+                            )
+                        }
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error: ${e.message}")
+                    val hexString =
+                        byteArray.joinToString(separator = " ") { byte -> "%02x".format(byte) }
+                    Log.d("GATTService", "onCharacteristicChanged: $hexString")
                 }
+
             }
         )
     }
