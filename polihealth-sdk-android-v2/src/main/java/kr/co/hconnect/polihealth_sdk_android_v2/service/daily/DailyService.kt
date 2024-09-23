@@ -37,7 +37,7 @@ class DailyApiService {
             DailyProtocol01API.saveStringToFile(
                 context,
                 DailyProtocol01API.ltmModel.toString(),
-                "protocol01.txt"
+                "protocol01${DateUtil.getCurrentDateTime()}.txt"
             )
         }
 
