@@ -34,11 +34,20 @@ class DailyApiService {
     suspend fun sendProtocol01New(context: Context? = null): Daily1Response {
 
         context?.let {
+            // bin 파일 저장
+            DailyProtocol01API.saveToBinFile(
+                context,
+                DailyProtocol01API.byteArray,
+                "bin_protocol01_${DateUtil.getCurrentDateTime()}.bin"
+            )
+            // txt 파일 저장
             DailyProtocol01API.saveStringToFile(
                 context,
                 DailyProtocol01API.ltmModel.toString(),
-                "protocol01${DateUtil.getCurrentDateTime()}.txt"
+                "txt_protocol01${DateUtil.getCurrentDateTime()}.txt"
             )
+
+            DailyProtocol01API.clearCollectedBytes()
         }
 
         return DailyProtocol01API.requestPost(

@@ -78,9 +78,11 @@ object PoliBLE {
                             CoroutineScope(Dispatchers.IO).launch {
 
                                 DailyProtocol01API.categorizeData(it)
+                                DailyProtocol01API.collectBytes(it)
 
                                 if (it[1] == 0xFF.toByte()) {
                                     DailyProtocol01API.createLTMModel()
+
                                     try {
                                         val response: Daily1Response =
                                             DailyApiService().sendProtocol01New(context)
@@ -256,7 +258,7 @@ object PoliBLE {
                     }
                     val hexString =
                         byteArray.joinToString(separator = " ") { byte -> "%02x".format(byte) }
-                    Log.d("GATTService", "onCharacteristicChanged: $hexString")
+                    Log.d("GATTService", "ByteSize: ${byteArray.size}")
                 }
 
             }

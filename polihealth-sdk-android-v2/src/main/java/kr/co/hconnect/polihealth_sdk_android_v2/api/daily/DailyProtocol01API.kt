@@ -19,9 +19,22 @@ import java.io.OutputStream
 
 object DailyProtocol01API {
     var ltmModel: LTMModel? = null
-    val lstLux = mutableListOf<LTMModel.Lux>()
-    val lstSkinTemp = mutableListOf<LTMModel.SkinTemp>()
-    val lstMets = mutableListOf<LTMModel.Mets>()
+    private val lstLux = mutableListOf<LTMModel.Lux>()
+    private val lstSkinTemp = mutableListOf<LTMModel.SkinTemp>()
+    private val lstMets = mutableListOf<LTMModel.Mets>()
+    private var _byteArray: ByteArray = byteArrayOf()
+
+    val byteArray: ByteArray
+        get() = _byteArray
+
+    // addByte 함수: 바이트 배열을 추가
+    fun collectBytes(byteArray: ByteArray) {
+        _byteArray += byteArray // 기존의 _byteArray에 새로운 byteArray를 추가
+    }
+
+    fun clearCollectedBytes() {
+        _byteArray = byteArrayOf()
+    }
 
     /**
      * TODO: 조도값, 피부온도값, 활동량값을 서버로 전송하는 API
@@ -172,7 +185,7 @@ object DailyProtocol01API {
                 val metsValue =
                     ((bytes[offset + 2 * j].toInt() and 0xFF shl 8) or (bytes[offset + 2 * j + 1].toInt() and 0xFF)).toShort()
                         .toInt()
-                lstMets.add(LTMModel.Mets(metsValue / 1000)) // metLoopCnt 분씩 감소 해야함.
+                lstMets.add(LTMModel.Mets(metsValue / 1000))
             }
 
             // Temp 데이터 추출 (4Bytes)
@@ -225,6 +238,42 @@ object DailyProtocol01API {
             }
         } ?: run {
             Log.d("StringController", "No data to save")
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    fun saveToBinFile(context: Context? = null, data: ByteArray?, fileName: String) {
+        if (context == null) {
+            Log.e("ByteController", "Context is null")
+            return
+        }
+        data?.let {
+            try {
+                val outputStream: OutputStream?
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                    put(MediaStore.MediaColumns.MIME_TYPE, "application/octet-stream")
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/")
+                }
+
+                val uri = context.contentResolver.insert(
+                    MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                    contentValues
+                )
+                outputStream = uri?.let { context.contentResolver.openOutputStream(it) }
+
+                if (outputStream != null) {
+                    outputStream.write(it)
+                    outputStream.close()
+                    Log.d("ByteController", "Data saved to file: $fileName in Download folder")
+                } else {
+                    Log.e("ByteController", "Failed to create OutputStream")
+                }
+            } catch (e: Exception) {
+                Log.e("ByteController", "Error saving data to file", e)
+            }
+        } ?: run {
+            Log.d("ByteController", "No data to save")
         }
     }
 

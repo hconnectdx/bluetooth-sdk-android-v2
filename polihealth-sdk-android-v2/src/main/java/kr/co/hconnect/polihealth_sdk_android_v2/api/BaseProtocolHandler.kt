@@ -12,8 +12,6 @@ import java.io.OutputStream
 
 open class BaseProtocolHandler {
     private var _byteArray: ByteArray = byteArrayOf()
-    val byteArray: ByteArray
-        get() = _byteArray
 
     // addByte 함수: 바이트 배열을 추가
     fun addByte(byteArray: ByteArray) {
