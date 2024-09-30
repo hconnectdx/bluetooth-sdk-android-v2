@@ -118,11 +118,19 @@ object HCBle {
         ) == BluetoothProfile.STATE_CONNECTED
     }
 
-    fun getSelService(): BluetoothGattService {
+    fun getSelService(): BluetoothGattService? {
+        if (::gattService.isInitialized.not()) {
+            Log.e(TAG, "gattService is not initialized")
+            return null
+        }
         return gattService.selService
     }
 
-    fun getSelCharacteristic(): BluetoothGattCharacteristic {
+    fun getSelCharacteristic(): BluetoothGattCharacteristic? {
+        if (::gattService.isInitialized.not()) {
+            Log.e(TAG, "gattService is not initialized")
+            return null
+        }
         return gattService.selCharacteristic
     }
 
@@ -259,15 +267,17 @@ object HCBle {
      */
     fun disconnect(callback: (() -> Unit)? = null) {
         Log.d(TAG, "Disconnecting from device")
-        bluetoothGatt.disconnect()
+        if (::bluetoothGatt.isInitialized) {
+            bluetoothGatt.disconnect()
 
-        CoroutineScope(Dispatchers.Main).launch {
-            withTimeout(100) {
-                suspendCancellableCoroutine<Unit> { continuation ->
-                    continuation.invokeOnCancellation {
-                        Log.d(TAG, "disconnect: Canceled")
-                        bluetoothGatt.close()
-                        callback?.invoke()
+            CoroutineScope(Dispatchers.Main).launch {
+                withTimeout(100) {
+                    suspendCancellableCoroutine<Unit> { continuation ->
+                        continuation.invokeOnCancellation {
+                            Log.d(TAG, "disconnect: Canceled")
+                            bluetoothGatt.close()
+                            callback?.invoke()
+                        }
                     }
                 }
             }
@@ -280,6 +290,10 @@ object HCBle {
      * @return
      */
     fun getGattServiceList(): List<BluetoothGattService> {
+        if (::gattService.isInitialized.not()) {
+            Log.e(TAG, "gattService is not initialized")
+            return emptyList()
+        }
         return gattService.getGattServiceList()
     }
 
@@ -289,7 +303,12 @@ object HCBle {
      * @param uuid
      */
     fun setServiceUUID(uuid: String) {
-        gattService.setServiceUUID(uuid)
+
+        if (::bluetoothGatt.isInitialized) {
+            gattService.setServiceUUID(uuid)
+        } else {
+            Log.e(TAG, "bluetoothGatt is not initialized")
+        }
     }
 
     /**
@@ -324,18 +343,34 @@ object HCBle {
      * @param isEnable
      */
     fun setCharacteristicNotification(isEnable: Boolean) {
+        if (::gattService.isInitialized.not()) {
+            Log.e(TAG, "gattService is not initialized")
+            return
+        }
         gattService.setCharacteristicNotification(isEnable)
     }
 
     fun readCharacteristicNotification() {
+        if (::gattService.isInitialized.not()) {
+            Log.e(TAG, "gattService is not initialized")
+            return
+        }
         gattService.readCharacteristicNotification()
     }
 
     fun getBondedDevices(): List<BluetoothDevice> {
+        if (::bluetoothAdapter.isInitialized.not()) {
+            Log.e(TAG, "bluetoothAdapter is not initialized")
+            return emptyList()
+        }
         return bluetoothAdapter.bondedDevices.toList()
     }
 
-    fun getDevice(address: String): BluetoothDevice {
+    fun getDevice(address: String): BluetoothDevice? {
+        if (::bluetoothAdapter.isInitialized.not()) {
+            Log.e(TAG, "bluetoothAdapter is not initialized")
+            return null
+        }
         return bluetoothAdapter.getRemoteDevice(address)
     }
 
