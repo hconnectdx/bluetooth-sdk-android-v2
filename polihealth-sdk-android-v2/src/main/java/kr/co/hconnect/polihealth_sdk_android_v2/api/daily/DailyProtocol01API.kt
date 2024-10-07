@@ -183,8 +183,8 @@ object DailyProtocol01API {
             // METs 데이터 추출 (2Bytes * 5EA)
             for (j in 0 until 5) {
                 val metsValue =
-                    ((bytes[offset + 2 * j].toInt() and 0xFF shl 8) or (bytes[offset + 2 * j + 1].toInt() and 0xFF)).toShort()
-                        .toInt()
+                    ((bytes[offset + 2 * j].toUInt() and 255u shl 8) or (bytes[offset + 2 * j + 1].toUInt() and 0xFFu)).toInt()
+
                 lstMets.add(LTMModel.Mets(metsValue / 1000))
             }
 
