@@ -8,7 +8,7 @@ data class SleepEndResponse(
 ) : BaseResponse(), PoliResponse {
 
     data class Data(
-        val sleepQuality: Int
+        val sleepQuality: Int?
     )
 }
 
