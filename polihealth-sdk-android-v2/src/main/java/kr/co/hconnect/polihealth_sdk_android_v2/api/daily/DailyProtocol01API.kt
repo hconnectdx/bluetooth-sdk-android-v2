@@ -183,9 +183,12 @@ object DailyProtocol01API {
             // METs 데이터 추출 (2Bytes * 5EA)
             for (j in 0 until 5) {
                 val metsValue =
-                    ((bytes[offset + 2 * j].toUInt() and 255u shl 8) or (bytes[offset + 2 * j + 1].toUInt() and 0xFFu)).toInt()
+                    ((bytes[offset + 2 * j].toUInt() and 0xFFu shl 8) or (bytes[offset + 2 * j + 1].toUInt() and 0xFFu))
 
-                lstMets.add(LTMModel.Mets(metsValue / 1000))
+                Log.d("DailyProtocol01API", "metsValue toUInt: $metsValue")
+                Log.d("DailyProtocol01API", "metsValue toInt: ${metsValue.toInt()}")
+
+                lstMets.add(LTMModel.Mets(metsValue.toInt() / 1000))
             }
 
             // Temp 데이터 추출 (4Bytes)
@@ -217,7 +220,7 @@ object DailyProtocol01API {
                 val contentValues = ContentValues().apply {
                     put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
                     put(MediaStore.MediaColumns.MIME_TYPE, "text/plain") // MIME type 변경
-                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/")
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/poli_log")
                 }
 
                 val uri = context.contentResolver.insert(
@@ -253,7 +256,7 @@ object DailyProtocol01API {
                 val contentValues = ContentValues().apply {
                     put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
                     put(MediaStore.MediaColumns.MIME_TYPE, "application/octet-stream")
-                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/")
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/poli_log")
                 }
 
                 val uri = context.contentResolver.insert(

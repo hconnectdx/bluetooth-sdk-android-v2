@@ -54,7 +54,7 @@ open class BaseProtocolHandler {
                 val contentValues = ContentValues().apply {
                     put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
                     put(MediaStore.MediaColumns.MIME_TYPE, "application/octet-stream")
-                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/")
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/poli_log")
                 }
 
                 val uri = context.contentResolver.insert(
