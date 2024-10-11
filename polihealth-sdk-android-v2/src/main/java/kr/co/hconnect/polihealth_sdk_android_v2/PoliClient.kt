@@ -78,7 +78,7 @@ object PoliClient {
             println()
             println("[Request]")
             println("Method: ${this.context.method.value}")
-            println("URL: https://${this.context.url.host}${this.context.url.encodedPath}")
+            println("URL: https://${this.context.url.host}/${this.context.url.encodedPath}")
             println("Parameter: ${this.context.url.parameters.entries()}")
             println("Header: ${this.context.headers.entries()}")
 
