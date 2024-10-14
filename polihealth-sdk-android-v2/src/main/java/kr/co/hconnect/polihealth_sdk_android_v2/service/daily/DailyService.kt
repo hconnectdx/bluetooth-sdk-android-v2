@@ -2,6 +2,7 @@ package kr.co.hconnect.polihealth_sdk_android_app.service.sleep
 
 import android.content.Context
 import android.os.Build
+import android.util.Log
 import androidx.annotation.RequiresApi
 import kr.co.hconnect.polihealth_sdk_android.DateUtil
 import kr.co.hconnect.polihealth_sdk_android.api.daily.DailyProtocol01API
@@ -50,10 +51,23 @@ class DailyApiService {
             DailyProtocol01API.clearCollectedBytes()
         }
 
-        return DailyProtocol01API.requestPost(
-            DateUtil.getCurrentDateTime(),
-            DailyProtocol01API.ltmModel ?: LTMModel(arrayOf(), arrayOf(), arrayOf()) // 내일 바로 테스트
-        )
+        return try {
+            DailyProtocol01API.requestPost(
+                DateUtil.getCurrentDateTime(),
+                DailyProtocol01API.ltmModel ?: LTMModel(
+                    arrayOf(),
+                    arrayOf(),
+                    arrayOf()
+                ) // 내일 바로 테스트
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "sendProtocol01New: ${e.message}")
+            return Daily1Response().apply {
+                retCd = "500"
+                retMsg = e.message ?: "Unknown error"
+                resDate = DateUtil.getCurrentDateTime()
+            }
+        }
     }
 
     /**
@@ -66,12 +80,21 @@ class DailyApiService {
     suspend fun sendProtocol02(context: Context? = null): Daily2Response? {
         val protocol2Bytes = DailyProtocol02API.flush(context)
         if (protocol2Bytes.isNotEmpty()) {
-            val response: Daily2Response =
-                DailyProtocol02API.requestPost(
-                    DateUtil.getCurrentDateTime(),
-                    protocol2Bytes
-                )
-            return response
+            return try {
+                val response: Daily2Response =
+                    DailyProtocol02API.requestPost(
+                        DateUtil.getCurrentDateTime(),
+                        protocol2Bytes
+                    )
+                response
+            } catch (e: Exception) {
+                Log.e(TAG, "sendProtocol02: ${e.message}")
+                return Daily2Response().apply {
+                    retCd = "500"
+                    retMsg = e.message ?: "Unknown error"
+                    resDate = DateUtil.getCurrentDateTime()
+                }
+            }
         } else {
             return null
         }
@@ -84,10 +107,19 @@ class DailyApiService {
      * @return SleepCommResponse
      */
     suspend fun sendProtocol03(hrSpo2: HRSpO2): Daily3Response {
-        val response: Daily3Response = DailyProtocol03API.requestPost(
-            DateUtil.getCurrentDateTime(),
-            hrSpo2
-        )
-        return response
+
+        return try {
+            DailyProtocol03API.requestPost(
+                DateUtil.getCurrentDateTime(),
+                hrSpo2
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "sendProtocol03: ${e.message}")
+            return Daily3Response().apply {
+                retCd = "500"
+                retMsg = e.message ?: "Unknown error"
+                resDate = DateUtil.getCurrentDateTime()
+            }
+        }
     }
 }

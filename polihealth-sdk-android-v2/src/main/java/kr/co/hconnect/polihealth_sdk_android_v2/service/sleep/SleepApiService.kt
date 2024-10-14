@@ -2,6 +2,7 @@ package kr.co.hconnect.polihealth_sdk_android.service.sleep
 
 import android.content.Context
 import android.os.Build
+import android.util.Log
 import androidx.annotation.RequiresApi
 import kr.co.hconnect.polihealth_sdk_android.DateUtil
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.SleepEndResponse
@@ -11,6 +12,7 @@ import kr.co.hconnect.polihealth_sdk_android.api.sleep.SleepProtocol08API
 import kr.co.hconnect.polihealth_sdk_android.api.sleep.SleepProtocol09API
 import kr.co.hconnect.polihealth_sdk_android.api.sleep.SleepSessionAPI
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily3Response
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.SleepResponse
 
 class SleepApiService {
@@ -35,12 +37,19 @@ class SleepApiService {
         try {
             val protocol6Bytes = SleepProtocol06API.flush(context)
             if (protocol6Bytes.isNotEmpty()) {
-                val response: SleepResponse =
+                return try {
                     SleepProtocol06API.requestPost(
                         DateUtil.getCurrentDateTime(),
                         protocol6Bytes
                     )
-                return response
+                } catch (e: Exception) {
+                    Log.e(TAG, "sendProtocol06: ${e.message}")
+                    SleepResponse().apply {
+                        retCd = "500"
+                        retMsg = e.message ?: "Unknown error"
+                        resDate = DateUtil.getCurrentDateTime()
+                    }
+                }
             } else {
                 return null
             }
@@ -61,12 +70,19 @@ class SleepApiService {
     suspend fun sendProtocol07(context: Context?): SleepResponse? {
         val protocol7Bytes = SleepProtocol07API.flush(context)
         if (protocol7Bytes.isNotEmpty()) {
-            val response: SleepResponse =
+            return try {
                 SleepProtocol07API.requestPost(
                     DateUtil.getCurrentDateTime(),
                     protocol7Bytes
                 )
-            return response
+            } catch (e: Exception) {
+                Log.e(TAG, "sendProtocol07: ${e.message}")
+                SleepResponse().apply {
+                    retCd = "500"
+                    retMsg = e.message ?: "Unknown error"
+                    resDate = DateUtil.getCurrentDateTime()
+                }
+            }
         } else {
             return null
         }
@@ -82,12 +98,19 @@ class SleepApiService {
     suspend fun sendProtocol08(context: Context? = null): SleepResponse? {
         val protocol8Bytes = SleepProtocol08API.flush(context)
         if (protocol8Bytes.isNotEmpty()) {
-            val response: SleepResponse =
+            return try {
                 SleepProtocol08API.requestPost(
                     DateUtil.getCurrentDateTime(),
                     protocol8Bytes
                 )
-            return response
+            } catch (e: Exception) {
+                Log.e(TAG, "sendProtocol08: ${e.message}")
+                SleepResponse().apply {
+                    retCd = "500"
+                    retMsg = e.message ?: "Unknown error"
+                    resDate = DateUtil.getCurrentDateTime()
+                }
+            }
         } else {
             return null
         }
@@ -100,10 +123,18 @@ class SleepApiService {
      * @return SleepCommResponse
      */
     suspend fun sendProtocol09(hrSpo2: HRSpO2): SleepResponse {
-        val response: SleepResponse = SleepProtocol09API.requestPost(
-            DateUtil.getCurrentDateTime(),
-            hrSpo2
-        )
-        return response
+        return try {
+            SleepProtocol09API.requestPost(
+                DateUtil.getCurrentDateTime(),
+                hrSpo2
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "sendProtocol09: ${e.message}")
+            SleepResponse().apply {
+                retCd = "500"
+                retMsg = e.message ?: "Unknown error"
+                resDate = DateUtil.getCurrentDateTime()
+            }
+        }
     }
 }
