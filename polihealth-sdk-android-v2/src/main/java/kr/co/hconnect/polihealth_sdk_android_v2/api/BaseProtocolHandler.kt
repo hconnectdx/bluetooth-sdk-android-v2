@@ -11,7 +11,7 @@ import kr.co.hconnect.polihealth_sdk_android_v2.BuildConfig
 import java.io.OutputStream
 
 open class BaseProtocolHandler {
-    private var _byteArray: ByteArray = byteArrayOf()
+    var _byteArray: ByteArray = byteArrayOf()
 
     // addByte 함수: 바이트 배열을 추가
     fun addByte(byteArray: ByteArray) {

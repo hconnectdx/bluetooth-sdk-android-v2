@@ -108,6 +108,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun stopScan() {
+        PoliBLE.stopScan()
+    }
+
     @RequiresApi(Build.VERSION_CODES.Q)
     private fun setBtnProtocolTest() {
         val btnTest1: Button = findViewById(R.id.btn_test1)
@@ -234,6 +238,11 @@ class MainActivity : AppCompatActivity() {
 
             }
             startService(intent)
+        }
+
+        val btnStopScan: Button = findViewById(R.id.btn_stop_scan)
+        btnStopScan.setOnClickListener {
+            stopScan()
         }
     }
 

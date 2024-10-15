@@ -2,9 +2,13 @@ package kr.co.hconnect.polihealth_sdk_android
 
 enum class ProtocolType {
     PROTOCOL_1,
+    PROTOCOL_1_ERROR,
     PROTOCOL_2,
+    PROTOCOL_2_ERROR_LACK_OF_DATA,
+    PROTOCOL_2_ERROR,
     PROTOCOL_2_START,
     PROTOCOL_3_HR_SpO2,
+    PROTOCOL_3_HR_SpO2_ERROR,
     PROTOCOL_4_SLEEP_START,
     PROTOCOL_5_SLEEP_END,
     PROTOCOL_6,

@@ -23,6 +23,7 @@ import kr.co.hconnect.polihealth_sdk_android_app.api.sleep.DailyProtocol02API
 import kr.co.hconnect.polihealth_sdk_android_app.service.sleep.DailyApiService
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily1Response
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily2Response
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.SleepResponse
 
 object PoliBLE {
@@ -89,6 +90,8 @@ object PoliBLE {
                                         onReceive.invoke(ProtocolType.PROTOCOL_1, response)
                                     } catch (e: Exception) {
                                         e.printStackTrace()
+                                        onReceive.invoke(ProtocolType.PROTOCOL_1_ERROR, null)
+                                        Log.e(TAG, "sendProtocol01: ${e.message}")
                                     }
                                 }
                             }
@@ -101,19 +104,34 @@ object PoliBLE {
                             }
                             prevByte = it[1]
 
-                            checkProtocol2Validate(it[1])
                             DailyProtocol02API.addByte(removeFrontTwoBytes(it, 2))
+                            Log.d("Protocol2", "ByteSize: ${DailyProtocol02API._byteArray.size}")
 
                             if (it[1] == 0xFF.toByte()) {
                                 CoroutineScope(Dispatchers.IO).launch {
                                     try {
-                                        val response = DailyApiService().sendProtocol02(context)
-                                        onReceive.invoke(ProtocolType.PROTOCOL_2, response)
+                                        Log.d(
+                                            "Protocol2",
+                                            "ByteSizesss: ${DailyProtocol02API._byteArray.size}"
+                                        )
+                                        if (DailyProtocol02API._byteArray.size == 264_000) {
+                                            val response = DailyApiService().sendProtocol02(context)
+                                            onReceive.invoke(ProtocolType.PROTOCOL_2, response)
+                                        } else {
+                                            onReceive.invoke(
+                                                ProtocolType.PROTOCOL_2_ERROR_LACK_OF_DATA,
+                                                null
+                                            )
+                                        }
 
-                                        protocol2Count = 0
-                                        expectedByte = 0x00
                                     } catch (e: Exception) {
                                         e.printStackTrace()
+                                        onReceive.invoke(ProtocolType.PROTOCOL_2_ERROR, null)
+                                        Log.e(TAG, "sendProtocol02: ${e.message}")
+                                    } finally {
+                                        protocol2Count = 0
+                                        expectedByte = 0x00
+                                        DailyProtocol02API._byteArray = ByteArray(0)
                                     }
                                 }
                             }
@@ -131,6 +149,8 @@ object PoliBLE {
                                     )
                                 } catch (e: Exception) {
                                     e.printStackTrace()
+                                    onReceive.invoke(ProtocolType.PROTOCOL_3_HR_SpO2_ERROR, null)
+                                    Log.e(TAG, "sendProtocol03: ${e.message}")
                                 }
                             }
                         }
@@ -265,8 +285,8 @@ object PoliBLE {
         )
     }
 
-    private fun checkProtocol2Validate(it: Byte) {
-        if (it != expectedByte) {
+    private fun checkProtocol2Validate(it: Byte): Boolean {
+        if (it != 0xFF.toByte() && it != expectedByte) {
             Log.e(
                 "DataLogger",
                 "데이터 손실 감지: 예상 값 ${
@@ -276,10 +296,12 @@ object PoliBLE {
                     )
                 } 실제 값 ${String.format("0x%02X", it)}"
             )
+            return false
         }
         expectedByte =
             if (it == 0xFE.toByte()) 0x00 else (it + 1).toByte()
         Log.d("Protocol2 Count", "Count: ${++protocol2Count}")
+        return true
     }
 
 
