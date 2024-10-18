@@ -105,14 +105,13 @@ object PoliBLE {
                             prevByte = it[1]
 
                             DailyProtocol02API.addByte(removeFrontTwoBytes(it, 2))
-                            Log.d("Protocol2", "ByteSize: ${DailyProtocol02API._byteArray.size}")
 
                             if (it[1] == 0xFF.toByte()) {
                                 CoroutineScope(Dispatchers.IO).launch {
                                     try {
                                         Log.d(
                                             "Protocol2",
-                                            "ByteSizesss: ${DailyProtocol02API._byteArray.size}"
+                                            "ByteSizes: ${DailyProtocol02API._byteArray.size}"
                                         )
                                         if (DailyProtocol02API._byteArray.size == 264_000) {
                                             val response = DailyApiService().sendProtocol02(context)
@@ -131,7 +130,15 @@ object PoliBLE {
                                     } finally {
                                         protocol2Count = 0
                                         expectedByte = 0x00
+                                        Log.d(
+                                            TAG,
+                                            "바이트 어레이를 초기화했습니다. ${DailyProtocol02API._byteArray.size}"
+                                        )
                                         DailyProtocol02API._byteArray = ByteArray(0)
+                                        Log.d(
+                                            TAG,
+                                            "바이트 어레이를 초기화 확인. ${DailyProtocol02API._byteArray.size}"
+                                        )
                                     }
                                 }
                             }
