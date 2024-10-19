@@ -105,18 +105,7 @@ object PoliBLE {
 
                         0x03.toByte() -> {
                             CoroutineScope(Dispatchers.IO).launch {
-                                val hrSpO2: HRSpO2 =
-                                    HRSpO2Parser.asciiToHRSpO2(removeFrontTwoBytes(byteArray, 1))
-                                try {
-                                    val response = DailyApiService().sendProtocol03(hrSpO2)
-                                    onReceive.invoke(
-                                        ProtocolType.PROTOCOL_3_HR_SpO2,
-                                        response
-                                    )
-                                } catch (e: Exception) {
-                                    Log.e(TAG, "sendProtocol03: ${e.message}")
-                                    onReceive.invoke(ProtocolType.PROTOCOL_3_HR_SpO2_ERROR, null)
-                                }
+                                sendProtocol03ToApp(byteArray, onReceive)
                             }
                         }
 
@@ -249,6 +238,24 @@ object PoliBLE {
 
             }
         )
+    }
+
+    private suspend fun sendProtocol03ToApp(
+        byteArray: ByteArray,
+        onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
+    ) {
+        val hrSpO2: HRSpO2 =
+            HRSpO2Parser.asciiToHRSpO2(removeFrontTwoBytes(byteArray, 1))
+        try {
+            val response = DailyApiService().sendProtocol03(hrSpO2)
+            onReceive.invoke(
+                ProtocolType.PROTOCOL_3_HR_SpO2,
+                response
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "sendProtocol03: ${e.message}")
+            onReceive.invoke(ProtocolType.PROTOCOL_3_HR_SpO2_ERROR, null)
+        }
     }
 
     @RequiresApi(Build.VERSION_CODES.Q)
