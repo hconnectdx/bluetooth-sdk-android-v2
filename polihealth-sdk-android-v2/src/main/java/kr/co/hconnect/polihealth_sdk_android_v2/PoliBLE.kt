@@ -25,6 +25,7 @@ import kr.co.hconnect.polihealth_sdk_android_app.service.sleep.DailyApiService
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily1Response
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.SleepResponse
+import kr.co.hconnect.polihealth_sdk_android_v2.service.daily.DailyServiceToApp
 
 object PoliBLE {
     private const val TAG = "PoliBLE.kt"
@@ -77,7 +78,7 @@ object PoliBLE {
                     when (protocolType) {
                         0x01.toByte() -> {
                             CoroutineScope(Dispatchers.IO).launch {
-                                sendProtocol01ToApp(byteArray, context, onReceive)
+                                DailyServiceToApp.sendProtocol01ToApp(byteArray, context, onReceive)
                             }
                         }
 
@@ -96,7 +97,7 @@ object PoliBLE {
 
                                     // 데이터 순서가 0xFF (마지막) 이면 PROTOCOL_2 전송 이벤트 발생
                                     if (dataOrder == 0xFF.toByte()) {
-                                        sendProtocol2ToApp(context, onReceive)
+                                        DailyServiceToApp.sendProtocol2ToApp(context, onReceive)
                                         Log.d(TAG, "PROTOCOL_2_END")
                                     }
                                 }
@@ -105,7 +106,7 @@ object PoliBLE {
 
                         0x03.toByte() -> {
                             CoroutineScope(Dispatchers.IO).launch {
-                                sendProtocol03ToApp(byteArray, onReceive)
+                                DailyServiceToApp.sendProtocol03ToApp(byteArray, onReceive)
                             }
                         }
 
@@ -238,76 +239,6 @@ object PoliBLE {
 
             }
         )
-    }
-
-    private suspend fun sendProtocol03ToApp(
-        byteArray: ByteArray,
-        onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
-    ) {
-        val hrSpO2: HRSpO2 =
-            HRSpO2Parser.asciiToHRSpO2(removeFrontTwoBytes(byteArray, 1))
-        try {
-            val response = DailyApiService().sendProtocol03(hrSpO2)
-            onReceive.invoke(
-                ProtocolType.PROTOCOL_3_HR_SpO2,
-                response
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "sendProtocol03: ${e.message}")
-            onReceive.invoke(ProtocolType.PROTOCOL_3_HR_SpO2_ERROR, null)
-        }
-    }
-
-    @RequiresApi(Build.VERSION_CODES.Q)
-    private suspend fun sendProtocol2ToApp(
-        context: Context?,
-        onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
-    ) {
-        DailyProtocol02API.apply {
-            try {
-                if (byteArray.size == 264_000) {
-                    val response =
-                        DailyApiService().sendProtocol02(context)
-                    onReceive.invoke(ProtocolType.PROTOCOL_2, response)
-                } else {
-                    onReceive.invoke(
-                        ProtocolType.PROTOCOL_2_ERROR_LACK_OF_DATA,
-                        null
-                    )
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "sendProtocol02: ${e.message}")
-                onReceive.invoke(ProtocolType.PROTOCOL_2_ERROR, null)
-            } finally {
-                prevByte = 0x00
-                byteArray = ByteArray(0)
-            }
-        }
-    }
-
-    @RequiresApi(Build.VERSION_CODES.Q)
-    private suspend fun sendProtocol01ToApp(
-        byteArray: ByteArray,
-        context: Context?,
-        onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
-    ) {
-        DailyProtocol01API.categorizeData(byteArray)
-        DailyProtocol01API.collectBytes(byteArray)
-        if (byteArray[1] == 0xFF.toByte()) {
-
-            try {
-                DailyProtocol01API.createLTMModel()
-                val response: Daily1Response =
-                    DailyApiService().sendProtocol01New(context)
-                onReceive.invoke(ProtocolType.PROTOCOL_1, response)
-            } catch (e: Exception) {
-                e.printStackTrace()
-                onReceive.invoke(ProtocolType.PROTOCOL_1_ERROR, null)
-            } finally {
-                DailyProtocol01API.clearCollectedBytes()
-
-            }
-        }
     }
 
     private fun checkProtocol2Validate(it: Byte): Boolean {
