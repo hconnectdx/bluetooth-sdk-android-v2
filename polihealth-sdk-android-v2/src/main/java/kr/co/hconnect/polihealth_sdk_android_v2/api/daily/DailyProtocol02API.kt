@@ -1,7 +1,7 @@
-package kr.co.hconnect.polihealth_sdk_android_app.api.sleep
+package kr.co.hconnect.polihealth_sdk_android_v2.api.daily
 
+import android.content.ContentValues
 import android.content.Context
-import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import android.util.Log
@@ -9,18 +9,21 @@ import androidx.annotation.RequiresApi
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.post
-import io.ktor.client.statement.HttpResponse
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.util.AttributeKey
 import io.ktor.util.InternalAPI
-import kotlinx.coroutines.runBlocking
+import kr.co.hconnect.polihealth_sdk_android.DateUtil
 import kr.co.hconnect.polihealth_sdk_android.PoliClient
-import kr.co.hconnect.polihealth_sdk_android.api.BaseProtocolHandler
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily2Response
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.toDaily2Response
+import java.io.OutputStream
 
-object DailyProtocol02API : BaseProtocolHandler() {
+object DailyProtocol02API {
+
+    var prevByte: Byte = 0x00
+    var byteArray: ByteArray = byteArrayOf()
+
 
     /**
      * TODO: Protocol02을 서버로 전송하는 API
@@ -53,77 +56,66 @@ object DailyProtocol02API : BaseProtocolHandler() {
         return response
     }
 
+    fun clearByteArray() {
+        byteArray = byteArrayOf()
+    }
 
-    @OptIn(InternalAPI::class)
+    fun addByte(byteArray: ByteArray) {
+        this.byteArray += byteArray // 기존의 _byteArray에 새로운 byteArray를 추가
+    }
+
+    // flush 함수: 데이터를 반환하고 _byteArray를 비움
+
     @RequiresApi(Build.VERSION_CODES.Q)
-    fun testPost(context: Context) = runBlocking {
-        try {
-            val byteArray = readBytesFromDownload(context, "protocol02.bin")
+    fun flush(context: Context?): ByteArray {
 
-            val response: HttpResponse =
-                PoliClient.client.post("poli/day/protocol2") {
-                    body = MultiPartFormDataContent(
-                        formData {
-                            append("reqDate", "20240704054513")
-                            append("userSno", PoliClient.userSno)
-                            append("file", byteArray!!, Headers.build {
-                                append(
-                                    HttpHeaders.ContentDisposition,
-                                    "filename=\"\""
-                                )
-                            })
-                        }
-                    )
+        if (byteArray.isEmpty()) {
+            return byteArrayOf()
+        }
+
+        val tempByteArray = byteArray.clone() // 현재 _byteArray를 클론
+
+        byteArray = byteArrayOf()
+        context?.let {
+            saveToFile(
+                it,
+                tempByteArray,
+                "protocol ${DateUtil.getCurrentDateTime()}.bin"
+            )
+        } // 클론한 데이터를 파일로 저장
+
+        return tempByteArray // 클론한 데이터를 반환
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun saveToFile(context: Context, data: ByteArray?, fileName: String) {
+        data?.let {
+            try {
+                val outputStream: OutputStream?
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                    put(MediaStore.MediaColumns.MIME_TYPE, "application/octet-stream")
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/poli_log")
                 }
-            Log.d("SleepProtocol06API", "userSno: ${PoliClient.userSno}")
 
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    @RequiresApi(Build.VERSION_CODES.Q)
-    fun readBytesFromDownload(context: Context, fileName: String): ByteArray? {
-        val uri: Uri? = getUriFromFileName(context, fileName)
-        return uri?.let {
-            readBytesFromUri(context, it)
-        }
-    }
-
-    @RequiresApi(Build.VERSION_CODES.Q)
-    private fun getUriFromFileName(context: Context, fileName: String): Uri? {
-        val projection = arrayOf(MediaStore.Files.FileColumns._ID)
-        val selection = "${MediaStore.Files.FileColumns.DISPLAY_NAME} = ?"
-        val selectionArgs = arrayOf(fileName)
-
-        val cursor = context.contentResolver.query(
-            MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-            projection,
-            selection,
-            selectionArgs,
-            null
-        )
-
-        cursor?.use {
-            if (it.moveToFirst()) {
-                val id = it.getLong(it.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID))
-                return Uri.withAppendedPath(
+                val uri = context.contentResolver.insert(
                     MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-                    id.toString()
+                    contentValues
                 )
-            }
-        }
-        return null
-    }
+                outputStream = uri?.let { context.contentResolver.openOutputStream(it) }
 
-    private fun readBytesFromUri(context: Context, uri: Uri): ByteArray? {
-        return try {
-            context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                inputStream.readBytes()
+                if (outputStream != null) {
+                    outputStream.write(it)
+                    outputStream.close()
+                    Log.d("ByteController", "Data saved to file: $fileName in Download folder")
+                } else {
+                    Log.e("ByteController", "Failed to create OutputStream")
+                }
+            } catch (e: Exception) {
+                Log.e("ByteController", "Error saving data to file", e)
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
+        } ?: run {
+            Log.d("ByteController", "No data to save")
         }
     }
 }

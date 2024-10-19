@@ -16,8 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kr.co.hconnect.bluetooth_sdk_android_v2.service.BleService
-import kr.co.hconnect.bluetooth_sdk_android_v2.service.BleServiceInterface
-import kr.co.hconnect.polihealth_sdk_android.PoliBLE
+import kr.co.hconnect.polihealth_sdk_android_v2.PoliBLE
 import kr.co.hconnect.polihealth_sdk_android.PoliClient
 import kr.co.hconnect.polihealth_sdk_android.api.daily.DailyProtocol01API
 import kr.co.hconnect.polihealth_sdk_android.service.sleep.SleepApiService

@@ -7,7 +7,6 @@ import android.bluetooth.BluetoothGattService
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.widget.Button
 import android.widget.ExpandableListView
 import android.widget.TextView
@@ -17,7 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kr.co.hconnect.polihealth_sdk_android.BLEState
-import kr.co.hconnect.polihealth_sdk_android.PoliBLE
+import kr.co.hconnect.polihealth_sdk_android_v2.PoliBLE
 import kr.co.hconnect.polihealth_sdk_android.ProtocolType
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.BaseResponse
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.PoliResponse

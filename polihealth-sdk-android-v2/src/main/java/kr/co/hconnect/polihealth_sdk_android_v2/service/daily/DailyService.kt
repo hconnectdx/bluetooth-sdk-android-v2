@@ -8,8 +8,7 @@ import kr.co.hconnect.polihealth_sdk_android.DateUtil
 import kr.co.hconnect.polihealth_sdk_android.api.daily.DailyProtocol01API
 import kr.co.hconnect.polihealth_sdk_android.api.daily.DailyProtocol03API
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.LTMModel
-import kr.co.hconnect.polihealth_sdk_android_app.api.sleep.DailyProtocol02API
-import kr.co.hconnect.polihealth_sdk_android_v2.BuildConfig
+import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.DailyProtocol02API
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily1Response
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily2Response
@@ -75,26 +74,16 @@ class DailyApiService {
      * @return SleepCommResponse
      */
     @RequiresApi(Build.VERSION_CODES.Q)
-    suspend fun sendProtocol02(context: Context? = null): Daily2Response? {
+    suspend fun sendProtocol02(context: Context? = null): Daily2Response {
         val protocol2Bytes = DailyProtocol02API.flush(context)
         if (protocol2Bytes.isNotEmpty()) {
-            return try {
-                val response: Daily2Response =
-                    DailyProtocol02API.requestPost(
-                        DateUtil.getCurrentDateTime(),
-                        protocol2Bytes
-                    )
-                response
-            } catch (e: Exception) {
-                Log.e(TAG, "sendProtocol02: ${e.message}")
-                return Daily2Response().apply {
-                    retCd = "500"
-                    retMsg = e.message ?: "Unknown error"
-                    resDate = DateUtil.getCurrentDateTime()
-                }
-            }
+
+            return DailyProtocol02API.requestPost(
+                DateUtil.getCurrentDateTime(),
+                protocol2Bytes
+            )
         } else {
-            return null
+            throw Exception("Protocol02 bytes is empty")
         }
     }
 

@@ -1,4 +1,4 @@
-package kr.co.hconnect.polihealth_sdk_android
+package kr.co.hconnect.polihealth_sdk_android_v2
 
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGattService
@@ -9,26 +9,25 @@ import android.util.Log
 import androidx.annotation.RequiresApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kr.co.hconnect.bluetooth_sdk_android.HCBle
+import kr.co.hconnect.polihealth_sdk_android.HRSpO2Parser
+import kr.co.hconnect.polihealth_sdk_android.ProtocolType
 import kr.co.hconnect.polihealth_sdk_android.api.daily.DailyProtocol01API
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.PoliResponse
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.SleepEndResponse
 import kr.co.hconnect.polihealth_sdk_android.api.sleep.SleepProtocol06API
 import kr.co.hconnect.polihealth_sdk_android.api.sleep.SleepProtocol07API
 import kr.co.hconnect.polihealth_sdk_android.api.sleep.SleepProtocol08API
-import kr.co.hconnect.polihealth_sdk_android.api.sleep.SleepProtocol08API.toHexString
 import kr.co.hconnect.polihealth_sdk_android.service.sleep.SleepApiService
-import kr.co.hconnect.polihealth_sdk_android_app.api.sleep.DailyProtocol02API
+import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.DailyProtocol02API
 import kr.co.hconnect.polihealth_sdk_android_app.service.sleep.DailyApiService
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily1Response
-import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily2Response
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.SleepResponse
 
 object PoliBLE {
-    private const val TAG = "PoliBLE"
+    private const val TAG = "PoliBLE.kt"
     fun init(context: Context) {
         HCBle.init(context)
     }
@@ -45,7 +44,6 @@ object PoliBLE {
 
     private var expectedByte: Byte = 0x00
     private var protocol2Count = 0
-    private var prevByte: Byte = 0x00
 
     @RequiresApi(Build.VERSION_CODES.Q)
     fun connectDevice(
@@ -74,9 +72,9 @@ object PoliBLE {
             onReceive = { characteristic ->
                 val receivedArray = characteristic.value ?: ByteArray(0)
                 receivedArray.let { byteArray ->
-                    val dataOrder = byteArray[0]
-                    
-                    when (dataOrder) {
+                    val protocolType = byteArray[0]
+
+                    when (protocolType) {
                         0x01.toByte() -> {
                             CoroutineScope(Dispatchers.IO).launch {
                                 sendProtocol01ToApp(byteArray, context, onReceive)
@@ -84,46 +82,22 @@ object PoliBLE {
                         }
 
                         0x02.toByte() -> {
-                            if (prevByte != 0xFE.toByte() && byteArray[1] == 0x00.toByte()) {
-                                onReceive.invoke(ProtocolType.PROTOCOL_2_START, null)
-                            }
-                            prevByte = byteArray[1]
-
-                            DailyProtocol02API.addByte(removeFrontTwoBytes(byteArray, 2))
-
-                            if (byteArray[1] == 0xFF.toByte()) {
+                            DailyProtocol02API.apply {
                                 CoroutineScope(Dispatchers.IO).launch {
-                                    try {
-//                                        Log.d(
-//                                            "Protocol2",
-//                                            "ByteSizes: ${DailyProtocol02API._byteArray.size}"
-//                                        )
-                                        if (DailyProtocol02API._byteArray.size == 264_000) {
-                                            val response = DailyApiService().sendProtocol02(context)
-                                            onReceive.invoke(ProtocolType.PROTOCOL_2, response)
-                                        } else {
-                                            onReceive.invoke(
-                                                ProtocolType.PROTOCOL_2_ERROR_LACK_OF_DATA,
-                                                null
-                                            )
-                                        }
+                                    // 데이터 순서가 0x00 (처음) 이면 PROTOCOL_2_START 이벤트 발생
+                                    // 이전 데이터 순서가 0xFE면 맨 처음이 아님
+                                    val dataOrder = byteArray[1]
+                                    if (prevByte != 0xFE.toByte() && dataOrder == 0x00.toByte()) {
+                                        onReceive.invoke(ProtocolType.PROTOCOL_2_START, null)
+                                        Log.d(TAG, "PROTOCOL_2_START")
+                                    }
+                                    prevByte = dataOrder
+                                    addByte(removeFrontTwoBytes(byteArray, 2))
 
-                                    } catch (e: Exception) {
-                                        e.printStackTrace()
-                                        onReceive.invoke(ProtocolType.PROTOCOL_2_ERROR, null)
-                                        Log.e(TAG, "sendProtocol02: ${e.message}")
-                                    } finally {
-                                        protocol2Count = 0
-                                        expectedByte = 0x00
-                                        Log.d(
-                                            TAG,
-                                            "바이트 어레이를 초기화했습니다. ${DailyProtocol02API._byteArray.size}"
-                                        )
-                                        DailyProtocol02API._byteArray = ByteArray(0)
-                                        Log.d(
-                                            TAG,
-                                            "바이트 어레이를 초기화 확인. ${DailyProtocol02API._byteArray.size}"
-                                        )
+                                    // 데이터 순서가 0xFF (마지막) 이면 PROTOCOL_2 전송 이벤트 발생
+                                    if (dataOrder == 0xFF.toByte()) {
+                                        sendProtocol2ToApp(context, onReceive)
+                                        Log.d(TAG, "PROTOCOL_2_END")
                                     }
                                 }
                             }
@@ -258,13 +232,14 @@ object PoliBLE {
                         }
 
                         else -> {
-                            Log.e(TAG, "Unknown Protocol: ${
-                                byteArray.joinToString(separator = " ") { byte ->
-                                    "%02x".format(
-                                        byte
-                                    )
-                                }
-                            }"
+                            Log.e(
+                                TAG, "Unknown Protocol: ${
+                                    byteArray.joinToString(separator = " ") { byte ->
+                                        "%02x".format(
+                                            byte
+                                        )
+                                    }
+                                }"
                             )
                         }
                     }
@@ -277,6 +252,34 @@ object PoliBLE {
         )
     }
 
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private suspend fun sendProtocol2ToApp(
+        context: Context?,
+        onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
+    ) {
+        DailyProtocol02API.apply {
+            try {
+                if (byteArray.size == 264_000) {
+                    val response =
+                        DailyApiService().sendProtocol02(context)
+                    onReceive.invoke(ProtocolType.PROTOCOL_2, response)
+                } else {
+                    onReceive.invoke(
+                        ProtocolType.PROTOCOL_2_ERROR_LACK_OF_DATA,
+                        null
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "sendProtocol02: ${e.message}")
+                onReceive.invoke(ProtocolType.PROTOCOL_2_ERROR, null)
+            } finally {
+                prevByte = 0x00
+                byteArray = ByteArray(0)
+            }
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
     private suspend fun sendProtocol01ToApp(
         byteArray: ByteArray,
         context: Context?,
