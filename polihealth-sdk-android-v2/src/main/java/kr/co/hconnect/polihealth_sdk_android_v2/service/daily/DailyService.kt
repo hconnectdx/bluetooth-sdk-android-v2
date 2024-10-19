@@ -94,19 +94,9 @@ class DailyApiService {
      * @return SleepCommResponse
      */
     suspend fun sendProtocol03(hrSpo2: HRSpO2): Daily3Response {
-
-        return try {
-            DailyProtocol03API.requestPost(
-                DateUtil.getCurrentDateTime(),
-                hrSpo2
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "sendProtocol03: ${e.message}")
-            return Daily3Response().apply {
-                retCd = "500"
-                retMsg = e.message ?: "Unknown error"
-                resDate = DateUtil.getCurrentDateTime()
-            }
-        }
+        return DailyProtocol03API.requestPost(
+            DateUtil.getCurrentDateTime(),
+            hrSpo2
+        )
     }
 }

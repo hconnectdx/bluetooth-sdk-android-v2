@@ -114,9 +114,8 @@ object PoliBLE {
                                         response
                                     )
                                 } catch (e: Exception) {
-                                    e.printStackTrace()
-                                    onReceive.invoke(ProtocolType.PROTOCOL_3_HR_SpO2_ERROR, null)
                                     Log.e(TAG, "sendProtocol03: ${e.message}")
+                                    onReceive.invoke(ProtocolType.PROTOCOL_3_HR_SpO2_ERROR, null)
                                 }
                             }
                         }
