@@ -42,7 +42,7 @@ open class BaseProtocolHandler {
     }
 
     // 바이트 배열을 16진수 문자열로 변환하는 헬퍼 함수
-    private fun ByteArray.toHexString(): String =
+    fun ByteArray.toHexString(): String =
         joinToString(separator = " ") { byte -> "%02x".format(byte) }
 
     // flush 결과를 파일로 저장하는 함수

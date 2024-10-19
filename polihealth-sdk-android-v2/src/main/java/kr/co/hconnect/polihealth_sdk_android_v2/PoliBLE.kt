@@ -18,6 +18,7 @@ import kr.co.hconnect.polihealth_sdk_android.api.dto.response.SleepEndResponse
 import kr.co.hconnect.polihealth_sdk_android.api.sleep.SleepProtocol06API
 import kr.co.hconnect.polihealth_sdk_android.api.sleep.SleepProtocol07API
 import kr.co.hconnect.polihealth_sdk_android.api.sleep.SleepProtocol08API
+import kr.co.hconnect.polihealth_sdk_android.api.sleep.SleepProtocol08API.toHexString
 import kr.co.hconnect.polihealth_sdk_android.service.sleep.SleepApiService
 import kr.co.hconnect.polihealth_sdk_android_app.api.sleep.DailyProtocol02API
 import kr.co.hconnect.polihealth_sdk_android_app.service.sleep.DailyApiService
@@ -71,48 +72,32 @@ object PoliBLE {
                 onSubscriptionState.invoke(state)
             },
             onReceive = { characteristic ->
-                val byteArray = characteristic.value ?: ByteArray(0)
-                byteArray.let {
-
-                    when (it[0]) {
+                val receivedArray = characteristic.value ?: ByteArray(0)
+                receivedArray.let { byteArray ->
+                    val dataOrder = byteArray[0]
+                    
+                    when (dataOrder) {
                         0x01.toByte() -> {
                             CoroutineScope(Dispatchers.IO).launch {
-
-                                DailyProtocol01API.categorizeData(it)
-                                DailyProtocol01API.collectBytes(it)
-
-                                if (it[1] == 0xFF.toByte()) {
-                                    DailyProtocol01API.createLTMModel()
-
-                                    try {
-                                        val response: Daily1Response =
-                                            DailyApiService().sendProtocol01New(context)
-                                        onReceive.invoke(ProtocolType.PROTOCOL_1, response)
-                                    } catch (e: Exception) {
-                                        e.printStackTrace()
-                                        onReceive.invoke(ProtocolType.PROTOCOL_1_ERROR, null)
-                                        Log.e(TAG, "sendProtocol01: ${e.message}")
-                                    }
-                                }
+                                sendProtocol01ToApp(byteArray, context, onReceive)
                             }
                         }
 
                         0x02.toByte() -> {
-                            // 이전이 0xFE일 경우 들어오지 않음 (초기에 한 번만 들어오게 하는 처리)
-                            if (prevByte != 0xFE.toByte() && it[1] == 0x00.toByte()) {
+                            if (prevByte != 0xFE.toByte() && byteArray[1] == 0x00.toByte()) {
                                 onReceive.invoke(ProtocolType.PROTOCOL_2_START, null)
                             }
-                            prevByte = it[1]
+                            prevByte = byteArray[1]
 
-                            DailyProtocol02API.addByte(removeFrontTwoBytes(it, 2))
+                            DailyProtocol02API.addByte(removeFrontTwoBytes(byteArray, 2))
 
-                            if (it[1] == 0xFF.toByte()) {
+                            if (byteArray[1] == 0xFF.toByte()) {
                                 CoroutineScope(Dispatchers.IO).launch {
                                     try {
-                                        Log.d(
-                                            "Protocol2",
-                                            "ByteSizes: ${DailyProtocol02API._byteArray.size}"
-                                        )
+//                                        Log.d(
+//                                            "Protocol2",
+//                                            "ByteSizes: ${DailyProtocol02API._byteArray.size}"
+//                                        )
                                         if (DailyProtocol02API._byteArray.size == 264_000) {
                                             val response = DailyApiService().sendProtocol02(context)
                                             onReceive.invoke(ProtocolType.PROTOCOL_2, response)
@@ -147,7 +132,7 @@ object PoliBLE {
                         0x03.toByte() -> {
                             CoroutineScope(Dispatchers.IO).launch {
                                 val hrSpO2: HRSpO2 =
-                                    HRSpO2Parser.asciiToHRSpO2(removeFrontTwoBytes(it, 1))
+                                    HRSpO2Parser.asciiToHRSpO2(removeFrontTwoBytes(byteArray, 1))
                                 try {
                                     val response = DailyApiService().sendProtocol03(hrSpO2)
                                     onReceive.invoke(
@@ -193,9 +178,9 @@ object PoliBLE {
                         }
 
                         0x06.toByte() -> {
-                            SleepProtocol06API.addByte(removeFrontTwoBytes(it, 2))
+                            SleepProtocol06API.addByte(removeFrontTwoBytes(byteArray, 2))
 
-                            if (it[1] == 0xFF.toByte()) {
+                            if (byteArray[1] == 0xFF.toByte()) {
                                 CoroutineScope(Dispatchers.IO).launch {
                                     try {
                                         val response = SleepApiService().sendProtocol06(context)
@@ -213,9 +198,9 @@ object PoliBLE {
                         }
 
                         0x07.toByte() -> {
-                            SleepProtocol07API.addByte(removeFrontTwoBytes(it, 2))
+                            SleepProtocol07API.addByte(removeFrontTwoBytes(byteArray, 2))
 
-                            if (it[1] == 0xFF.toByte()) {
+                            if (byteArray[1] == 0xFF.toByte()) {
                                 CoroutineScope(Dispatchers.IO).launch {
                                     try {
                                         val response = SleepApiService().sendProtocol07(context)
@@ -233,9 +218,9 @@ object PoliBLE {
                         }
 
                         0x08.toByte() -> {
-                            SleepProtocol08API.addByte(removeFrontTwoBytes(it, 2))
+                            SleepProtocol08API.addByte(removeFrontTwoBytes(byteArray, 2))
 
-                            if (it[1] == 0xFF.toByte()) {
+                            if (byteArray[1] == 0xFF.toByte()) {
                                 CoroutineScope(Dispatchers.IO).launch {
                                     try {
                                         val response: SleepResponse? =
@@ -255,7 +240,7 @@ object PoliBLE {
 
                         0x09.toByte() -> {
                             val hrSpO2: HRSpO2 =
-                                HRSpO2Parser.asciiToHRSpO2(removeFrontTwoBytes(it, 1))
+                                HRSpO2Parser.asciiToHRSpO2(removeFrontTwoBytes(byteArray, 1))
 
                             CoroutineScope(Dispatchers.IO).launch {
                                 try {
@@ -285,11 +270,35 @@ object PoliBLE {
                     }
                     val hexString =
                         byteArray.joinToString(separator = " ") { byte -> "%02x".format(byte) }
-                    Log.d("GATTService", "ByteSize: ${byteArray.size}")
+//                    Log.d("GATTService", "ByteSize: ${byteArray.size}")
                 }
 
             }
         )
+    }
+
+    private suspend fun sendProtocol01ToApp(
+        byteArray: ByteArray,
+        context: Context?,
+        onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
+    ) {
+        DailyProtocol01API.categorizeData(byteArray)
+        DailyProtocol01API.collectBytes(byteArray)
+        if (byteArray[1] == 0xFF.toByte()) {
+
+            try {
+                DailyProtocol01API.createLTMModel()
+                val response: Daily1Response =
+                    DailyApiService().sendProtocol01New(context)
+                onReceive.invoke(ProtocolType.PROTOCOL_1, response)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                onReceive.invoke(ProtocolType.PROTOCOL_1_ERROR, null)
+            } finally {
+                DailyProtocol01API.clearCollectedBytes()
+
+            }
+        }
     }
 
     private fun checkProtocol2Validate(it: Byte): Boolean {

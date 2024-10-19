@@ -94,37 +94,37 @@ class DeviceDetailActivity : AppCompatActivity() {
             this,
             device,
             onReceive = { type: ProtocolType, response: PoliResponse? ->
-                Log.d("DeviceDetailActivity", "onReceive: $type, $response")
+//                Log.d("DeviceDetailActivity", "onReceive: $type, $response")
 
                 when (response) {
                     is Daily1Response -> {
                         val daily1Response = response as Daily1Response
-                        Log.d("DeviceDetailActivity", "Protocol1Response: $daily1Response")
+//                        Log.d("DeviceDetailActivity", "Protocol1Response: $daily1Response")
                     }
 
                     is Daily2Response -> {
                         val daily2Response = response as Daily2Response
-                        Log.d("DeviceDetailActivity", "Protocol2Response: $daily2Response")
+//                        Log.d("DeviceDetailActivity", "Protocol2Response: $daily2Response")
                     }
 
                     is Daily3Response -> {
                         val daily3Response = response as Daily3Response
-                        Log.d("DeviceDetailActivity", "Protocol3Response: $daily3Response")
+//                        Log.d("DeviceDetailActivity", "Protocol3Response: $daily3Response")
                     }
 
                     is SleepResponse -> {
                         val baseResponse = response as SleepResponse
-                        Log.d("DeviceDetailActivity", "BaseResponse: $baseResponse")
+//                        Log.d("DeviceDetailActivity", "BaseResponse: $baseResponse")
                     }
 
                     is SleepEndResponse -> {
                         val baseResponse = response as SleepEndResponse
-                        Log.d("DeviceDetailActivity", "BaseResponse: $baseResponse")
+//                        Log.d("DeviceDetailActivity", "BaseResponse: $baseResponse")
                     }
 
                     is BaseResponse -> {
                         val baseResponse = response as BaseResponse
-                        Log.d("DeviceDetailActivity", "BaseResponse: $baseResponse")
+//                        Log.d("DeviceDetailActivity", "BaseResponse: $baseResponse")
                     }
                 }
             },

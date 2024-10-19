@@ -10,6 +10,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.util.AttributeKey
 import kr.co.hconnect.polihealth_sdk_android.DateUtil
+import kr.co.hconnect.polihealth_sdk_android.PoliBLE
 import kr.co.hconnect.polihealth_sdk_android.PoliClient
 import kr.co.hconnect.polihealth_sdk_android.api.dto.request.LTMRequest
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.LTMModel

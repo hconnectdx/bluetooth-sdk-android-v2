@@ -75,7 +75,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
 
     implementation("org.slf4j:slf4j-simple:1.7.30")
-    implementation("kr.co.hconnect:bluetooth-sdk-android-v2:0.0.7")
+    implementation("kr.co.hconnect:bluetooth-sdk-android-v2:0.0.9")
 
 //    implementation(project(":bluetooth-sdk-android-v2"))
 }

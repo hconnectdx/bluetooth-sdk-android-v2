@@ -47,8 +47,6 @@ class DailyApiService {
                 DailyProtocol01API.ltmModel.toString(),
                 "txt_protocol01${DateUtil.getCurrentDateTime()}.txt"
             )
-
-            DailyProtocol01API.clearCollectedBytes()
         }
 
         return try {

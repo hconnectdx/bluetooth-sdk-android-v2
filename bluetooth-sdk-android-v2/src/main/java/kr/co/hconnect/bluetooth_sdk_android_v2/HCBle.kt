@@ -232,7 +232,7 @@ object HCBle {
             ) {
                 super.onCharacteristicRead(gatt, characteristic, status)
                 if (status == BluetoothGatt.GATT_SUCCESS) {
-                    Log.d(TAG_GATT_SERVICE, "onCharacteristicRead: $status")
+//                    Log.d(TAG_GATT_SERVICE, "onCharacteristicRead: $status")
                 }
                 onReadCharacteristic?.invoke(status)
             }
@@ -243,7 +243,7 @@ object HCBle {
                 characteristic: BluetoothGattCharacteristic?
             ) {
                 super.onCharacteristicChanged(gatt, characteristic)
-                Log.d(TAG_GATT_SERVICE, "onCharacteristicChanged: ${characteristic?.value}")
+//                Log.d(TAG_GATT_SERVICE, "onCharacteristicChanged: ${characteristic?.value}")
                 onReceive?.invoke(characteristic!!)
             }
 
@@ -266,7 +266,7 @@ object HCBle {
      * @param callback
      */
     fun disconnect(callback: (() -> Unit)? = null) {
-        Log.d(TAG, "Disconnecting from device")
+//        Log.d(TAG, "Disconnecting from device")
         if (::bluetoothGatt.isInitialized) {
             bluetoothGatt.disconnect()
 
@@ -274,7 +274,7 @@ object HCBle {
                 withTimeout(100) {
                     suspendCancellableCoroutine<Unit> { continuation ->
                         continuation.invokeOnCancellation {
-                            Log.d(TAG, "disconnect: Canceled")
+//                            Log.d(TAG, "disconnect: Canceled")
                             bluetoothGatt.close()
                             callback?.invoke()
                         }
@@ -291,7 +291,7 @@ object HCBle {
      */
     fun getGattServiceList(): List<BluetoothGattService> {
         if (::gattService.isInitialized.not()) {
-            Log.e(TAG, "gattService is not initialized")
+//            Log.e(TAG, "gattService is not initialized")
             return emptyList()
         }
         return gattService.getGattServiceList()
@@ -307,7 +307,7 @@ object HCBle {
         if (::bluetoothGatt.isInitialized) {
             gattService.setServiceUUID(uuid)
         } else {
-            Log.e(TAG, "bluetoothGatt is not initialized")
+//            Log.e(TAG, "bluetoothGatt is not initialized")
         }
     }
 
