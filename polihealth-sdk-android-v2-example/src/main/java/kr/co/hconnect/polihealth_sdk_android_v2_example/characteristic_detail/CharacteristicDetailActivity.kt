@@ -5,7 +5,7 @@ import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import android.widget.Toast
-import kr.co.hconnect.bluetooth_sdk_android.HCBle
+import kr.co.hconnect.bluetooth_sdk_android_v2.HCBle
 import kr.co.hconnect.polihealth_sdk_android_v2.PoliBLE
 import kr.co.hconnect.polihealth_sdk_android_v2_example.R
 

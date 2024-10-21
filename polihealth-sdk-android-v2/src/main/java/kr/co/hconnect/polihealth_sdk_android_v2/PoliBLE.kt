@@ -10,10 +10,9 @@ import androidx.annotation.RequiresApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kr.co.hconnect.bluetooth_sdk_android.HCBle
+import kr.co.hconnect.bluetooth_sdk_android_v2.HCBle
 import kr.co.hconnect.polihealth_sdk_android.HRSpO2Parser
 import kr.co.hconnect.polihealth_sdk_android.ProtocolType
-import kr.co.hconnect.polihealth_sdk_android.api.daily.DailyProtocol01API
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.PoliResponse
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.SleepEndResponse
 import kr.co.hconnect.polihealth_sdk_android.api.sleep.SleepProtocol06API
@@ -21,11 +20,10 @@ import kr.co.hconnect.polihealth_sdk_android.api.sleep.SleepProtocol07API
 import kr.co.hconnect.polihealth_sdk_android.api.sleep.SleepProtocol08API
 import kr.co.hconnect.polihealth_sdk_android.service.sleep.SleepApiService
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.DailyProtocol02API
-import kr.co.hconnect.polihealth_sdk_android_app.service.sleep.DailyApiService
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
-import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily1Response
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.SleepResponse
 import kr.co.hconnect.polihealth_sdk_android_v2.service.daily.DailyServiceToApp
+import kr.co.hconnect.polihealth_sdk_android_v2.utils.toHexString
 
 object PoliBLE {
     private const val TAG = "PoliBLE.kt"
@@ -74,6 +72,7 @@ object PoliBLE {
                 val receivedArray = characteristic.value ?: ByteArray(0)
                 receivedArray.let { byteArray ->
                     val protocolType = byteArray[0]
+                    val dataOrder = byteArray[1]
 
                     when (protocolType) {
                         0x01.toByte() -> {
@@ -87,10 +86,9 @@ object PoliBLE {
                                 CoroutineScope(Dispatchers.IO).launch {
                                     // 데이터 순서가 0x00 (처음) 이면 PROTOCOL_2_START 이벤트 발생
                                     // 이전 데이터 순서가 0xFE면 맨 처음이 아님
-                                    val dataOrder = byteArray[1]
+                                    Log.d(TAG, "DataOrder_: ${dataOrder.toHexString()}")
                                     if (prevByte != 0xFE.toByte() && dataOrder == 0x00.toByte()) {
                                         onReceive.invoke(ProtocolType.PROTOCOL_2_START, null)
-                                        Log.d(TAG, "PROTOCOL_2_START")
                                     }
                                     prevByte = dataOrder
                                     addByte(removeFrontTwoBytes(byteArray, 2))
@@ -98,7 +96,6 @@ object PoliBLE {
                                     // 데이터 순서가 0xFF (마지막) 이면 PROTOCOL_2 전송 이벤트 발생
                                     if (dataOrder == 0xFF.toByte()) {
                                         DailyServiceToApp.sendProtocol2ToApp(context, onReceive)
-                                        Log.d(TAG, "PROTOCOL_2_END")
                                     }
                                 }
                             }

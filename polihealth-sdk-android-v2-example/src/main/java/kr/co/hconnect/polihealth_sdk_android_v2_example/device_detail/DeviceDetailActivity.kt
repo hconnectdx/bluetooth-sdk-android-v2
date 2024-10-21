@@ -7,6 +7,7 @@ import android.bluetooth.BluetoothGattService
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.widget.Button
 import android.widget.ExpandableListView
 import android.widget.TextView
@@ -93,7 +94,7 @@ class DeviceDetailActivity : AppCompatActivity() {
             this,
             device,
             onReceive = { type: ProtocolType, response: PoliResponse? ->
-//                Log.d("DeviceDetailActivity", "onReceive: $type, $response")
+                Log.d("DeviceDetailActivity", "onReceive: $type, $response")
 
                 when (response) {
                     is Daily1Response -> {

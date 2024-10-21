@@ -1,4 +1,4 @@
-package kr.co.hconnect.bluetooth_sdk_android
+package kr.co.hconnect.bluetooth_sdk_android_v2
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
@@ -16,17 +16,19 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.os.Handler
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 import kr.co.hconnect.bluetooth_sdk_android.gatt.BLEState
 import kr.co.hconnect.bluetooth_sdk_android.gatt.GATTService
 import kr.co.hconnect.bluetooth_sdk_android.scan.BleScanHandler
+import kotlin.coroutines.resume
 
 @SuppressLint("MissingPermission")
 object HCBle {
@@ -37,7 +39,7 @@ object HCBle {
     private lateinit var bluetoothManager: BluetoothManager
     private lateinit var bluetoothAdapter: BluetoothAdapter
     private lateinit var bluetoothLeScanner: BluetoothLeScanner
-    private lateinit var bluetoothGatt: BluetoothGatt
+    private var bluetoothGatt: BluetoothGatt? = null
 
     private var scanning = false
     private lateinit var scanHandler: BleScanHandler
@@ -53,12 +55,12 @@ object HCBle {
      * @param context
      */
     fun init(context: Context) {
-        if (::appContext.isInitialized) {
+        if (HCBle::appContext.isInitialized) {
             Log.e(TAG, "appContext already to initialize")
             return
         }
 
-        this.appContext = context
+        appContext = context
         bluetoothManager = appContext.getSystemService(BluetoothManager::class.java)
         bluetoothAdapter = bluetoothManager.adapter
         bluetoothLeScanner = bluetoothAdapter.bluetoothLeScanner
@@ -119,7 +121,7 @@ object HCBle {
     }
 
     fun getSelService(): BluetoothGattService? {
-        if (::gattService.isInitialized.not()) {
+        if (HCBle::gattService.isInitialized.not()) {
             Log.e(TAG, "gattService is not initialized")
             return null
         }
@@ -127,7 +129,7 @@ object HCBle {
     }
 
     fun getSelCharacteristic(): BluetoothGattCharacteristic? {
-        if (::gattService.isInitialized.not()) {
+        if (HCBle::gattService.isInitialized.not()) {
             Log.e(TAG, "gattService is not initialized")
             return null
         }
@@ -161,8 +163,12 @@ object HCBle {
                 if (BluetoothDevice.ACTION_BOND_STATE_CHANGED == action) {
                     val bondState =
                         intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.ERROR)
-                    onBondState?.invoke(bondState)
-                    BLEState.BOND_BONDED
+                    if (bondState == BluetoothDevice.BOND_NONE) {
+                        Log.d(TAG, "본딩이 해제 되었습니다. 연결도 해제합니다.")
+                        disconnect()
+                    } else {
+                        onBondState?.invoke(bondState)
+                    }
                 }
             }
         }
@@ -174,42 +180,66 @@ object HCBle {
             )
         }
 
-        bluetoothGatt = device.connectGatt(appContext, true, object : BluetoothGattCallback() {
+        bluetoothGatt = getGattConnection(
+            device,
+            onConnState,
+            onGattServiceState,
+            onReadCharacteristic,
+            onWriteCharacteristic,
+            onSubscriptionState,
+            onReceive
+        )
+
+        gattService = GATTService(bluetoothGatt!!)
+    }
+
+    private fun getGattConnection(
+        device: BluetoothDevice,
+        onConnState: ((state: Int) -> Unit)? = null,
+        onGattServiceState: ((state: Int) -> Unit)? = null,
+        onReadCharacteristic: ((status: Int) -> Unit)? = null,
+        onWriteCharacteristic: ((status: Int) -> Unit)? = null,
+        onSubscriptionState: ((state: Boolean) -> Unit)? = null,
+        onReceive: ((characteristic: BluetoothGattCharacteristic) -> Unit)? = null
+    ): BluetoothGatt {
+        return device.connectGatt(appContext, true, object : BluetoothGattCallback() {
             @SuppressLint("MissingPermission")
             override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
                 super.onConnectionStateChange(gatt, status, newState)
-                Log.d(TAG_GATT_SERVICE, "${newState}321312")
-                if (newState == BLEState.STATE_CONNECTED) {
-                    Log.d(TAG, "Connected to GATT server.")
-                    Log.d(
-                        TAG_GATT_SERVICE,
-                        "Attempting to start service discovery: " + bluetoothGatt.discoverServices()
-                    )
-                } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                    Log.d(TAG_GATT_SERVICE, "${newState}")
-                } else {
-                    Log.d(TAG_GATT_SERVICE, "${newState}321312")
+
+                when (newState) {
+                    BLEState.STATE_CONNECTED -> {
+                        bluetoothGatt?.discoverServices()
+                        Log.d(TAG, "Connected to GATT server.")
+                    }
+
+                    else -> {
+                        Log.d(TAG, getGattStateString(newState))
+                    }
                 }
+
                 onConnState?.invoke(newState)
             }
 
             override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
                 super.onServicesDiscovered(gatt, status)
                 if (status == BLEState.GATT_SUCCESS) {
-                    Log.d(TAG_GATT_SERVICE, "onServicesDiscovered: $status")
+                    Log.d(TAG, getGattStateString(status))
 
                     gatt?.services?.let {
                         gattService.setGattServiceList(it)
-
                     } ?: run {
-                        Log.e(TAG_GATT_SERVICE, "onServicesDiscovered: gatt.services is null")
+                        Log.e(TAG, "onServicesDiscovered: gatt.services is null")
                     }
 
                 } else {
-                    Log.w(TAG_GATT_SERVICE, "onServicesDiscovered received: $status")
+                    Log.d(
+                        TAG,
+                        "onServicesDiscovered received: ${getGattStateString(status)}"
+                    )
                 }
-                onGattServiceState?.invoke(status)
 
+                onGattServiceState?.invoke(status)
             }
 
             override fun onCharacteristicWrite(
@@ -219,7 +249,7 @@ object HCBle {
             ) {
                 super.onCharacteristicWrite(gatt, characteristic, status)
                 if (status == BluetoothGatt.GATT_SUCCESS) {
-                    Log.d(TAG_GATT_SERVICE, "onCharacteristicWrite: $status")
+                    Log.d(TAG_GATT_SERVICE, "onCharacteristicWrite: ${getGattStateString(status)}")
                 }
                 onWriteCharacteristic?.invoke(status)
             }
@@ -257,30 +287,34 @@ object HCBle {
             }
 
         })
-
-        gattService = GATTService(bluetoothGatt)
     }
+
 
     /**
      * TODO: 디바이스와 연결을 해제합니다.
      * @param callback
      */
     fun disconnect(callback: (() -> Unit)? = null) {
-//        Log.d(TAG, "Disconnecting from device")
-        if (::bluetoothGatt.isInitialized) {
-            bluetoothGatt.disconnect()
-
+        if (bluetoothGatt != null) {
             CoroutineScope(Dispatchers.Main).launch {
-                withTimeout(100) {
-                    suspendCancellableCoroutine<Unit> { continuation ->
-                        continuation.invokeOnCancellation {
-//                            Log.d(TAG, "disconnect: Canceled")
-                            bluetoothGatt.close()
-                            callback?.invoke()
+                try {
+                    withTimeout(5_000) { // 타임아웃을 2초로 설정
+                        suspendCancellableCoroutine<Unit> { continuation ->
+                            bluetoothGatt?.disconnect()
+                            bluetoothGatt?.close()
+                            Log.w(TAG, "disconnect success.")
+                            continuation.resume(Unit) // 성공적으로 종료되면 resume 호출
                         }
                     }
+                } catch (e: TimeoutCancellationException) {
+                    Log.w(TAG, "Timeout during Bluetooth disconnect.")
+                } finally {
+                    delay(1_000)
+                    callback?.invoke() // 연결 해제 후 콜백 호출
                 }
             }
+        } else {
+            callback?.invoke() // GATT가 초기화되지 않은 경우에도 콜백 호출
         }
     }
 
@@ -290,7 +324,7 @@ object HCBle {
      * @return
      */
     fun getGattServiceList(): List<BluetoothGattService> {
-        if (::gattService.isInitialized.not()) {
+        if (HCBle::gattService.isInitialized.not()) {
 //            Log.e(TAG, "gattService is not initialized")
             return emptyList()
         }
@@ -304,7 +338,7 @@ object HCBle {
      */
     fun setServiceUUID(uuid: String) {
 
-        if (::bluetoothGatt.isInitialized) {
+        if (bluetoothGatt != null) {
             gattService.setServiceUUID(uuid)
         } else {
 //            Log.e(TAG, "bluetoothGatt is not initialized")
@@ -343,7 +377,7 @@ object HCBle {
      * @param isEnable
      */
     fun setCharacteristicNotification(isEnable: Boolean) {
-        if (::gattService.isInitialized.not()) {
+        if (HCBle::gattService.isInitialized.not()) {
             Log.e(TAG, "gattService is not initialized")
             return
         }
@@ -351,7 +385,7 @@ object HCBle {
     }
 
     fun readCharacteristicNotification() {
-        if (::gattService.isInitialized.not()) {
+        if (HCBle::gattService.isInitialized.not()) {
             Log.e(TAG, "gattService is not initialized")
             return
         }
@@ -359,7 +393,7 @@ object HCBle {
     }
 
     fun getBondedDevices(): List<BluetoothDevice> {
-        if (::bluetoothAdapter.isInitialized.not()) {
+        if (HCBle::bluetoothAdapter.isInitialized.not()) {
             Log.e(TAG, "bluetoothAdapter is not initialized")
             return emptyList()
         }
@@ -367,11 +401,22 @@ object HCBle {
     }
 
     fun getDevice(address: String): BluetoothDevice? {
-        if (::bluetoothAdapter.isInitialized.not()) {
+        if (HCBle::bluetoothAdapter.isInitialized.not()) {
             Log.e(TAG, "bluetoothAdapter is not initialized")
             return null
         }
         return bluetoothAdapter.getRemoteDevice(address)
     }
+
+    fun getGattStateString(state: Int): String {
+        return when (state) {
+            BLEState.STATE_DISCONNECTED -> "STATE_DISCONNECTED"
+            BLEState.STATE_CONNECTING -> "STATE_CONNECTING"
+            BLEState.STATE_CONNECTED -> "STATE_CONNECTED"
+            BLEState.STATE_DISCONNECTING -> "STATE_DISCONNECTING"
+            else -> "UNKNOWN_STATE"
+        }
+    }
+
 
 }
