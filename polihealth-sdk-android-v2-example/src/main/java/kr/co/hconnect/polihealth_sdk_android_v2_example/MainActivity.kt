@@ -56,16 +56,17 @@ class MainActivity : AppCompatActivity() {
     private fun setBtnScan() {
         val btnStartScan: Button = findViewById(R.id.btn_start_scan)
         btnStartScan.setOnClickListener {
-
+            val permissions =
+                if (Build.VERSION.SDK_INT > Build.VERSION_CODES.R) Permissions.PERMISSION_SDK_31 else Permissions.PERMISSION_SDK_30
             val isGranted = PermissionManager.isGrantedPermissions(
                 context = this@MainActivity,
-                permissions = Permissions.PERMISSION_SDK_31
+                permissions = permissions
             )
             if (!isGranted) {
                 PermissionManager.launchPermissions(
-                    permissions = Permissions.PERMISSION_SDK_31,
-                    resultCallback = { permissions ->
-                        if (permissions.all { it.value }) {
+                    permissions = permissions,
+                    resultCallback = { p ->
+                        if (p.all { it.value }) {
                             startScan()
                         } else {
                             Toast.makeText(this, "Permission Denied", Toast.LENGTH_SHORT).show()

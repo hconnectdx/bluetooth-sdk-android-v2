@@ -9,6 +9,14 @@
         android:name="android.permission.BLUETOOTH_ADMIN"
         android:maxSdkVersion="30" />
 
+    <uses-permission
+        android:name="android.permission.ACCESS_FINE_LOCATION"
+        android:maxSdkVersion="30" />
+
+    <uses-permission
+        android:name="android.permission.ACCESS_COARSE_LOCATION"
+        android:maxSdkVersion="30" />
+
     <!-- 블루투스 장치를 찾는 경우에만 필요합니다.-->
     <!-- 앱이 블루투스 스캔 결과를 사용하여 물리적 위치 정보를 파생하지 않는 경우-->
     <!-- 앱이 물리적 위치를 파생하지 않는다고 단언할 수 있습니다.-->
