@@ -83,32 +83,32 @@ class GATTService(private val bluetoothGatt: BluetoothGatt) {
         }
     }
 
-    fun setCharacteristicNotification(isEnable: Boolean) {
+    fun setCharacteristicNotification(isEnable: Boolean, isIndicate: Boolean = false) {
+        // 알림 또는 인디케이션 설정
         bluetoothGatt.setCharacteristicNotification(_selCharacteristic, isEnable)
+
+        // CCCD (Client Characteristic Configuration Descriptor) UUID
         val descriptor =
             _selCharacteristic.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"))
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // API 33 이상
-            if (isEnable) {
-                bluetoothGatt.writeDescriptor(
-                    descriptor,
-                    BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-                )
-            } else {
-                bluetoothGatt.writeDescriptor(
-                    descriptor,
-                    BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
-                )
+        // Descriptor가 존재하는지 체크
+        descriptor?.let {
+            val value = when {
+                isEnable && isIndicate -> BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
+                isEnable -> BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                else -> BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
             }
-        } else { // API 32 이하
-            if (isEnable) {
-                descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+
+            // API 33 이상인 경우와 이하 버전에 맞게 처리
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                bluetoothGatt.writeDescriptor(descriptor, value)
             } else {
-                descriptor.value = BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
+                descriptor.value = value
+                bluetoothGatt.writeDescriptor(descriptor)
             }
-            bluetoothGatt.writeDescriptor(descriptor)
-        }
+        } ?: Log.e("BluetoothGatt", "Descriptor not found for characteristic")
     }
+
 
     fun readCharacteristicNotification() {
         val descriptor =

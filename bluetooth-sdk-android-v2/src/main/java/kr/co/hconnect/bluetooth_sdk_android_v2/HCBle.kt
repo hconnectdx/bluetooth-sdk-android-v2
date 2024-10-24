@@ -203,7 +203,6 @@ object HCBle {
         onReceive: ((characteristic: BluetoothGattCharacteristic) -> Unit)? = null
     ): BluetoothGatt {
         return device.connectGatt(appContext, true, object : BluetoothGattCallback() {
-            @SuppressLint("MissingPermission")
             override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
                 super.onConnectionStateChange(gatt, status, newState)
 
@@ -261,9 +260,8 @@ object HCBle {
                 status: Int
             ) {
                 super.onCharacteristicRead(gatt, characteristic, status)
-                if (status == BluetoothGatt.GATT_SUCCESS) {
-//                    Log.d(TAG_GATT_SERVICE, "onCharacteristicRead: $status")
-                }
+
+                Log.d(TAG_GATT_SERVICE, "onCharacteristicRead: ${getGattStateString(status)}")
                 onReadCharacteristic?.invoke(status)
             }
 
@@ -273,7 +271,7 @@ object HCBle {
                 characteristic: BluetoothGattCharacteristic?
             ) {
                 super.onCharacteristicChanged(gatt, characteristic)
-//                Log.d(TAG_GATT_SERVICE, "onCharacteristicChanged: ${characteristic?.value}")
+                Log.d(TAG_GATT_SERVICE, "onCharacteristicChanged: ${characteristic?.value}")
                 onReceive?.invoke(characteristic!!)
             }
 
@@ -376,12 +374,12 @@ object HCBle {
      * setCharacteristicUUID로 설정된 캐릭터리스틱에 알림을 설정합니다.
      * @param isEnable
      */
-    fun setCharacteristicNotification(isEnable: Boolean) {
+    fun setCharacteristicNotification(isEnable: Boolean, isIndicate: Boolean = false) {
         if (HCBle::gattService.isInitialized.not()) {
             Log.e(TAG, "gattService is not initialized")
             return
         }
-        gattService.setCharacteristicNotification(isEnable)
+        gattService.setCharacteristicNotification(isEnable, isIndicate)
     }
 
     fun readCharacteristicNotification() {

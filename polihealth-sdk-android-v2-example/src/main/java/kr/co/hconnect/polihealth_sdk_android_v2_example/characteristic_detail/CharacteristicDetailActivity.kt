@@ -29,7 +29,7 @@ class CharacteristicDetailActivity : AppCompatActivity() {
             // Notify 기능을 구현합니다.
             Toast.makeText(this, "밴드를 구독합니다.", Toast.LENGTH_SHORT).show()
             PoliBLE.apply {
-                setCharacteristicNotification(true)
+                setCharacteristicNotification(isEnable = true, isIndicate = true)
             }
         }
 

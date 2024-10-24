@@ -320,8 +320,8 @@ object PoliBLE {
      * setCharacteristicUUID로 설정된 캐릭터리스틱에 알림을 설정합니다.
      * @param isEnable
      */
-    fun setCharacteristicNotification(isEnable: Boolean) {
-        HCBle.setCharacteristicNotification(isEnable)
+    fun setCharacteristicNotification(isEnable: Boolean, isIndicate: Boolean = false) {
+        HCBle.setCharacteristicNotification(isEnable, isIndicate)
     }
 
     fun getBondedDevices(): List<BluetoothDevice> {

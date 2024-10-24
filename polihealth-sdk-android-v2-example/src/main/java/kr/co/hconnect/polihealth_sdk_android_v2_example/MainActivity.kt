@@ -1,7 +1,11 @@
 package kr.co.hconnect.polihealth_sdk_android_v2_example
 
+import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -258,6 +262,22 @@ class MainActivity : AppCompatActivity() {
         PermissionManager.registerPermissionLauncher(this)
         PoliClient.userAge = 111
         PoliClient.userSno = 999
+
+
+        val bluetoothManager =
+            applicationContext.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        val bluetoothAdapter = bluetoothManager.adapter
+
+        if (bluetoothAdapter != null && applicationContext.packageManager.hasSystemFeature(
+                PackageManager.FEATURE_BLUETOOTH_LE
+            )
+        ) {
+            Log.d("Bluetooth", "This device supports Bluetooth Low Energy (BLE)")
+        } else {
+            Log.d("Bluetooth", "This device does not support BLE")
+        }
+
+
     }
 
     private inner class DeviceListAdapter(private val devices: List<BluetoothDevice>) :
