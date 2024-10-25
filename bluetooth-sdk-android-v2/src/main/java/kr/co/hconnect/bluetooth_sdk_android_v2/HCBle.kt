@@ -28,6 +28,7 @@ import kotlinx.coroutines.withTimeout
 import kr.co.hconnect.bluetooth_sdk_android.gatt.BLEState
 import kr.co.hconnect.bluetooth_sdk_android.gatt.GATTService
 import kr.co.hconnect.bluetooth_sdk_android.scan.BleScanHandler
+import java.util.UUID
 import kotlin.coroutines.resume
 
 @SuppressLint("MissingPermission")
@@ -193,6 +194,22 @@ object HCBle {
         gattService = GATTService(bluetoothGatt!!)
     }
 
+    private fun disableNotification() {
+        bluetoothGatt?.let { gatt ->
+            gatt.services.find { service ->
+                service.uuid == UUID.fromString("00001810-0000-1000-8000-00805f9b34fb")
+            }?.let { service ->
+                service.characteristics.forEach { char ->
+                    when (char.uuid) {
+                        UUID.fromString("00002a35-0000-1000-8000-00805f9b34fb") -> {
+                            gatt.setCharacteristicNotification(char, false)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private fun getGattConnection(
         device: BluetoothDevice,
         onConnState: ((state: Int) -> Unit)? = null,
@@ -202,6 +219,7 @@ object HCBle {
         onSubscriptionState: ((state: Boolean) -> Unit)? = null,
         onReceive: ((characteristic: BluetoothGattCharacteristic) -> Unit)? = null
     ): BluetoothGatt {
+        device.createBond()
         return device.connectGatt(appContext, true, object : BluetoothGattCallback() {
             override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
                 super.onConnectionStateChange(gatt, status, newState)
@@ -214,6 +232,7 @@ object HCBle {
 
                     else -> {
                         Log.d(TAG, getGattStateString(newState))
+                        disableNotification()
                     }
                 }
 
@@ -227,6 +246,7 @@ object HCBle {
 
                     gatt?.services?.let {
                         gattService.setGattServiceList(it)
+
                     } ?: run {
                         Log.e(TAG, "onServicesDiscovered: gatt.services is null")
                     }
