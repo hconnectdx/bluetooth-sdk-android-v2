@@ -1,6 +1,5 @@
 package kr.co.hconnect.polihealth_sdk_android_v2_example
 
-import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.content.Context
@@ -18,11 +17,12 @@ import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kr.co.hconnect.bluetooth_sdk_android_v2.service.BleService
 import kr.co.hconnect.polihealth_sdk_android_v2.PoliBLE
 import kr.co.hconnect.polihealth_sdk_android.PoliClient
-import kr.co.hconnect.polihealth_sdk_android.api.daily.DailyProtocol01API
+import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.DailyProtocol01API
 import kr.co.hconnect.polihealth_sdk_android.service.sleep.SleepApiService
 import kr.co.hconnect.polihealth_sdk_android_app.service.sleep.DailyApiService
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
@@ -247,6 +247,23 @@ class MainActivity : AppCompatActivity() {
         val btnStopScan: Button = findViewById(R.id.btn_stop_scan)
         btnStopScan.setOnClickListener {
             stopScan()
+        }
+
+        val btnSend0x03: Button = findViewById(R.id.btn_send_0x03)
+        btnSend0x03.setOnClickListener {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    PoliBLE.writeCharacteristic("0xE1".toByteArray())
+                    delay(100)
+                    PoliBLE.writeCharacteristic("0xA6".toByteArray())
+                    delay(100)
+                    PoliBLE.writeCharacteristic("0x01".toByteArray())
+                    delay(100)
+                    PoliBLE.writeCharacteristic("0x03".toByteArray())
+                } catch (e: Exception) {
+                    Log.e("MainActivity", "error: $e")
+                }
+            }
         }
     }
 

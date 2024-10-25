@@ -15,6 +15,7 @@ import io.ktor.util.AttributeKey
 import io.ktor.util.InternalAPI
 import kr.co.hconnect.polihealth_sdk_android.DateUtil
 import kr.co.hconnect.polihealth_sdk_android.PoliClient
+import kr.co.hconnect.polihealth_sdk_android_v2.api.SaveUtil
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily2Response
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.toDaily2Response
 import java.io.OutputStream
@@ -66,7 +67,6 @@ object DailyProtocol02API {
 
     // flush 함수: 데이터를 반환하고 _byteArray를 비움
 
-    @RequiresApi(Build.VERSION_CODES.Q)
     fun flush(context: Context?): ByteArray {
 
         if (byteArray.isEmpty()) {
@@ -77,7 +77,7 @@ object DailyProtocol02API {
 
         byteArray = byteArrayOf()
         context?.let {
-            saveToFile(
+            SaveUtil.saveToBinFile(
                 it,
                 tempByteArray,
                 "protocol ${DateUtil.getCurrentDateTime()}.bin"
@@ -85,37 +85,5 @@ object DailyProtocol02API {
         } // 클론한 데이터를 파일로 저장
 
         return tempByteArray // 클론한 데이터를 반환
-    }
-
-    @RequiresApi(Build.VERSION_CODES.Q)
-    private fun saveToFile(context: Context, data: ByteArray?, fileName: String) {
-        data?.let {
-            try {
-                val outputStream: OutputStream?
-                val contentValues = ContentValues().apply {
-                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                    put(MediaStore.MediaColumns.MIME_TYPE, "application/octet-stream")
-                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/poli_log")
-                }
-
-                val uri = context.contentResolver.insert(
-                    MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-                    contentValues
-                )
-                outputStream = uri?.let { context.contentResolver.openOutputStream(it) }
-
-                if (outputStream != null) {
-                    outputStream.write(it)
-                    outputStream.close()
-                    Log.d("ByteController", "Data saved to file: $fileName in Download folder")
-                } else {
-                    Log.e("ByteController", "Failed to create OutputStream")
-                }
-            } catch (e: Exception) {
-                Log.e("ByteController", "Error saving data to file", e)
-            }
-        } ?: run {
-            Log.d("ByteController", "No data to save")
-        }
     }
 }

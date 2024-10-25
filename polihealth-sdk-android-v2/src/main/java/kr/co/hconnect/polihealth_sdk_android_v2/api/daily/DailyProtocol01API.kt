@@ -1,8 +1,9 @@
-package kr.co.hconnect.polihealth_sdk_android.api.daily
+package kr.co.hconnect.polihealth_sdk_android_v2.api.daily
 
 import android.content.ContentValues
 import android.content.Context
 import android.os.Build
+import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import androidx.annotation.RequiresApi
@@ -12,9 +13,12 @@ import io.ktor.util.AttributeKey
 import kr.co.hconnect.polihealth_sdk_android.DateUtil
 import kr.co.hconnect.polihealth_sdk_android.PoliClient
 import kr.co.hconnect.polihealth_sdk_android.api.dto.request.LTMRequest
+import kr.co.hconnect.polihealth_sdk_android_v2.api.SaveUtil
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.LTMModel
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily1Response
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.toDaily1Response
+import java.io.File
+import java.io.FileOutputStream
 import java.io.OutputStream
 
 object DailyProtocol01API {
@@ -122,10 +126,10 @@ object DailyProtocol01API {
         )
 
         if (context != null) {
-            saveStringToFile(
+            SaveUtil.saveStringToFile(
                 context,
                 ltmModel.toString(),
-                "protocol1${DateUtil.getCurrentDateTime()}.txt"
+                "protocol1 ${DateUtil.getCurrentDateTime()}.txt"
             )
         } // 클론한 데이터를 파일로 저장
 
@@ -157,7 +161,7 @@ object DailyProtocol01API {
             mets = lstMetsWithTime.toTypedArray()
         )
 
-        this.ltmModel = ltmModel
+        DailyProtocol01API.ltmModel = ltmModel
     }
 
     private fun clearData() {
@@ -211,75 +215,6 @@ object DailyProtocol01API {
             offset += sampleSize
         }
     }
-
-    @RequiresApi(Build.VERSION_CODES.Q)
-    fun saveStringToFile(context: Context, data: String?, fileName: String) {
-        data?.let {
-            try {
-                val outputStream: OutputStream?
-                val contentValues = ContentValues().apply {
-                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                    put(MediaStore.MediaColumns.MIME_TYPE, "text/plain") // MIME type 변경
-                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/poli_log")
-                }
-
-                val uri = context.contentResolver.insert(
-                    MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-                    contentValues
-                )
-                outputStream = uri?.let { context.contentResolver.openOutputStream(it) }
-
-                if (outputStream != null) {
-                    outputStream.write(it.toByteArray())  // String을 ByteArray로 변환하여 저장
-                    outputStream.close()
-                    Log.d("StringController", "Data saved to file: $fileName in Download folder")
-                } else {
-                    Log.e("StringController", "Failed to create OutputStream")
-                }
-            } catch (e: Exception) {
-                Log.e("StringController", "Error saving data to file", e)
-            }
-        } ?: run {
-            Log.d("StringController", "No data to save")
-        }
-    }
-
-    @RequiresApi(Build.VERSION_CODES.Q)
-    fun saveToBinFile(context: Context? = null, data: ByteArray?, fileName: String) {
-        if (context == null) {
-            Log.e("ByteController", "Context is null")
-            return
-        }
-        data?.let {
-            try {
-                val outputStream: OutputStream?
-                val contentValues = ContentValues().apply {
-                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                    put(MediaStore.MediaColumns.MIME_TYPE, "application/octet-stream")
-                    put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/poli_log")
-                }
-
-                val uri = context.contentResolver.insert(
-                    MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-                    contentValues
-                )
-                outputStream = uri?.let { context.contentResolver.openOutputStream(it) }
-
-                if (outputStream != null) {
-                    outputStream.write(it)
-                    outputStream.close()
-                    Log.d("ByteController", "Data saved to file: $fileName in Download folder")
-                } else {
-                    Log.e("ByteController", "Failed to create OutputStream")
-                }
-            } catch (e: Exception) {
-                Log.e("ByteController", "Error saving data to file", e)
-            }
-        } ?: run {
-            Log.d("ByteController", "No data to save")
-        }
-    }
-
 
     val testRawData = byteArrayOf(
         0x01,

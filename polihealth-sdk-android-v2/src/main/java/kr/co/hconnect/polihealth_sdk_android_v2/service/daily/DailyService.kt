@@ -5,8 +5,10 @@ import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
 import kr.co.hconnect.polihealth_sdk_android.DateUtil
-import kr.co.hconnect.polihealth_sdk_android.api.daily.DailyProtocol01API
+import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.DailyProtocol01API
 import kr.co.hconnect.polihealth_sdk_android.api.daily.DailyProtocol03API
+import kr.co.hconnect.polihealth_sdk_android_v2.BuildConfig
+import kr.co.hconnect.polihealth_sdk_android_v2.api.SaveUtil
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.LTMModel
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.DailyProtocol02API
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
@@ -30,22 +32,23 @@ class DailyApiService {
         )
     }
 
-    @RequiresApi(Build.VERSION_CODES.Q)
     suspend fun sendProtocol01New(context: Context? = null): Daily1Response {
 
-        context?.let {
-            // bin 파일 저장
-            DailyProtocol01API.saveToBinFile(
-                context,
-                DailyProtocol01API.byteArray,
-                "bin_protocol01_${DateUtil.getCurrentDateTime()}.bin"
-            )
-            // txt 파일 저장
-            DailyProtocol01API.saveStringToFile(
-                context,
-                DailyProtocol01API.ltmModel.toString(),
-                "txt_protocol01${DateUtil.getCurrentDateTime()}.txt"
-            )
+        if (BuildConfig.IS_DEBUG) {
+            context?.let {
+                // bin 파일 저장
+                SaveUtil.saveToBinFile(
+                    context,
+                    DailyProtocol01API.byteArray,
+                    "bin_protocol01_${DateUtil.getCurrentDateTime()}.bin"
+                )
+                // txt 파일 저장
+                SaveUtil.saveStringToFile(
+                    context,
+                    DailyProtocol01API.ltmModel.toString(),
+                    "txt_protocol01${DateUtil.getCurrentDateTime()}.txt"
+                )
+            }
         }
 
         return try {

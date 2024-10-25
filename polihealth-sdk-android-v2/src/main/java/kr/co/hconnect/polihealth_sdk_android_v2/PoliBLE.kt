@@ -43,6 +43,7 @@ object PoliBLE {
 
     private var expectedByte: Byte = 0x00
     private var protocol2Count = 0
+    private var noMeaningData: Byte = 0x00 // 업데이트를 위한 의미없는 데이터
 
     @RequiresApi(Build.VERSION_CODES.Q)
     fun connectDevice(

@@ -101,6 +101,14 @@
             android:padding="5dp"
             android:text="스캔 멈춤" />
 
+        <Button
+            android:id="@+id/btn_send_0x03"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_columnWeight="1"
+            android:padding="5dp"
+            android:text="0x03 보내기" />
+
     </GridLayout>
 
     <TextView

@@ -6,7 +6,7 @@ import android.util.Log
 import androidx.annotation.RequiresApi
 import kr.co.hconnect.polihealth_sdk_android.HRSpO2Parser
 import kr.co.hconnect.polihealth_sdk_android.ProtocolType
-import kr.co.hconnect.polihealth_sdk_android.api.daily.DailyProtocol01API
+import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.DailyProtocol01API
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.PoliResponse
 import kr.co.hconnect.polihealth_sdk_android_app.service.sleep.DailyApiService
 import kr.co.hconnect.polihealth_sdk_android_v2.PoliBLE
