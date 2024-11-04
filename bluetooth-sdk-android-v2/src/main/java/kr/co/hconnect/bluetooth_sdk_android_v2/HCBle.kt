@@ -73,7 +73,11 @@ object HCBle {
      * TODO: BLE 스캔을 시작합니다
      * @param onScanResult
      */
-    fun scanLeDevice(scanPeriod: Long = SCAN_PERIOD, onScanResult: (ScanResult) -> Unit) {
+    fun scanLeDevice(
+        scanPeriod: Long = SCAN_PERIOD,
+        onScanResult: (ScanResult) -> Unit,
+        onScanStop: () -> Unit
+    ) {
         scanHandler = BleScanHandler(onScanResult)
 
         if (!scanning) {
@@ -88,6 +92,7 @@ object HCBle {
                                 Log.d(TAG, "scanLeDevice: Canceled")
                                 scanning = false
                                 bluetoothLeScanner.stopScan(scanHandler.leScanCallback)
+                                onScanStop()
                             }
                         }
                     }
