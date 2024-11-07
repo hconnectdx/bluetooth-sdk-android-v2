@@ -169,12 +169,8 @@ object HCBle {
                 if (BluetoothDevice.ACTION_BOND_STATE_CHANGED == action) {
                     val bondState =
                         intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.ERROR)
-                    if (bondState == BluetoothDevice.BOND_NONE) {
-                        Log.d(TAG, "본딩이 해제 되었습니다. 연결도 해제합니다.")
-                        disconnect()
-                    } else {
-                        onBondState?.invoke(bondState)
-                    }
+
+                    onBondState?.invoke(bondState)
                 }
             }
         }
