@@ -26,10 +26,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 import kr.co.hconnect.bluetooth_sdk_android.gatt.BLEState
-import kr.co.hconnect.bluetooth_sdk_android.gatt.GATTService
+import kr.co.hconnect.bluetooth_sdk_android_v2.gatt.GATTService
 import kr.co.hconnect.bluetooth_sdk_android.scan.BleScanHandler
+import kr.co.hconnect.bluetooth_sdk_android_v2.gatt.GATTController
+import kr.co.hconnect.bluetooth_sdk_android_v2.gatt.GATTState
+import kr.co.hconnect.bluetooth_sdk_android_v2.util.Logger
 import java.util.UUID
-import kotlin.coroutines.resume
 
 @SuppressLint("MissingPermission")
 object HCBle {
@@ -45,7 +47,10 @@ object HCBle {
     private var scanning = false
     private lateinit var scanHandler: BleScanHandler
 
-    private lateinit var gattService: GATTService
+//    private lateinit var gattService: GATTService
+
+
+    private var mapBLEGatt = mutableMapOf<String, GATTController>()
 
     // Stops scanning after 10 seconds.
     private val SCAN_PERIOD: Long = 10000
@@ -126,20 +131,39 @@ object HCBle {
         ) == BluetoothProfile.STATE_CONNECTED
     }
 
-    fun getSelService(): BluetoothGattService? {
-        if (HCBle::gattService.isInitialized.not()) {
-            Log.e(TAG, "gattService is not initialized")
-            return null
-        }
-        return gattService.selService
+    /**
+     * TODO 다르게 구현한 버전
+     *
+     * @param device
+     * @return
+     */
+    fun isConnected(device: BluetoothDevice): Boolean {
+        val bluetoothManager =
+            appContext.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        return bluetoothManager.getConnectionState(
+            device,
+            BluetoothProfile.GATT
+        ) == BluetoothProfile.STATE_CONNECTED
     }
 
-    fun getSelCharacteristic(): BluetoothGattCharacteristic? {
-        if (HCBle::gattService.isInitialized.not()) {
-            Log.e(TAG, "gattService is not initialized")
+
+    fun getSelService(deviceAddress: String): BluetoothGattService? {
+        val gattController: GATTController = mapBLEGatt[deviceAddress] ?: return null
+        if (mapBLEGatt[deviceAddress] == null) {
+            Logger.e("gattController is not initialized")
             return null
         }
-        return gattService.selCharacteristic
+
+        return gattController.selService
+    }
+
+    fun getSelCharacteristic(deviceAddress: String): BluetoothGattCharacteristic? {
+        val gattController: GATTController = mapBLEGatt[deviceAddress] ?: return null
+        if (mapBLEGatt[deviceAddress] == null) {
+            Logger.e("gattController is not initialized")
+            return null
+        }
+        return gattController.selCharacteristic
     }
 
     /**
@@ -182,17 +206,22 @@ object HCBle {
             )
         }
 
-        bluetoothGatt = getGattConnection(
-            device,
-            onConnState,
-            onGattServiceState,
-            onReadCharacteristic,
-            onWriteCharacteristic,
-            onSubscriptionState,
-            onReceive
-        )
 
-        gattService = GATTService(bluetoothGatt!!)
+        mapBLEGatt[device.address] = GATTController(
+            getGattConnection(
+                device,
+                onConnState,
+                onGattServiceState,
+                onReadCharacteristic,
+                onWriteCharacteristic,
+                onSubscriptionState,
+                onReceive
+            )
+        )
+    }
+
+    fun getGattController(deviceAddress: String): GATTController? {
+        return mapBLEGatt[deviceAddress]
     }
 
     private fun disableNotification() {
@@ -211,6 +240,14 @@ object HCBle {
         }
     }
 
+    private fun logConnStateChange(title: String, gatt: BluetoothGatt?, newState: Int) {
+        Logger.d("[${gatt?.device}] ${title}: ${BLEState.getStateString(newState)}")
+    }
+
+    private fun logGattStateChange(title: String, gatt: BluetoothGatt?, gattStatus: Int) {
+        Logger.d("[${gatt?.device}] ${title}: ${GATTState.getStatusDescription(gattStatus)}")
+    }
+
     private fun getGattConnection(
         device: BluetoothDevice,
         onConnState: ((state: Int) -> Unit)? = null,
@@ -222,41 +259,38 @@ object HCBle {
     ): BluetoothGatt {
         device.createBond()
         return device.connectGatt(appContext, true, object : BluetoothGattCallback() {
+
+            /**
+             * TODO: 디바이스와 연결 상태가 변경될 때 호출됩니다.
+             */
             override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
                 super.onConnectionStateChange(gatt, status, newState)
+                logConnStateChange("onConnectionStateChange", gatt, newState)
+                val address = gatt?.device?.address ?: ""
 
                 when (newState) {
-                    BLEState.STATE_CONNECTED -> {
-                        bluetoothGatt?.discoverServices()
-                        Log.d(TAG, "Connected to GATT server.")
-                    }
-
-                    else -> {
-                        Log.d(TAG, getGattStateString(newState))
-                        disableNotification()
-                    }
+                    BLEState.STATE_CONNECTED -> mapBLEGatt[address]?.bluetoothGatt?.discoverServices()
+                    else -> disableNotification()
                 }
 
                 onConnState?.invoke(newState)
             }
 
+            /**
+             * TODO: GATT 서비스가 발견되었을 때 호출됩니다.
+             */
             override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
                 super.onServicesDiscovered(gatt, status)
-                if (status == BLEState.GATT_SUCCESS) {
-                    Log.d(TAG, getGattStateString(status))
-
+                logGattStateChange("onServicesDiscovered", gatt, status)
+                val address = gatt?.device?.address
+                if (status == GATTState.GATT_SUCCESS) {
                     gatt?.services?.let {
-                        gattService.setGattServiceList(it)
-
+                        mapBLEGatt[address]?.setGattServiceList(gatt.services)
                     } ?: run {
-                        Log.e(TAG, "onServicesDiscovered: gatt.services is null")
+                        Logger.e("onServicesDiscovered: gatt.services is null")
                     }
-
                 } else {
-                    Log.d(
-                        TAG,
-                        "onServicesDiscovered received: ${getGattStateString(status)}"
-                    )
+                    Logger.e("onServicesDiscovered received: ${GATTState.getStatusDescription(status)}")
                 }
 
                 onGattServiceState?.invoke(status)
@@ -313,16 +347,20 @@ object HCBle {
      * TODO: 디바이스와 연결을 해제합니다.
      * @param callback
      */
-    fun disconnect(callback: (() -> Unit)? = null) {
-        if (bluetoothGatt != null) {
+    fun disconnect(address: String, callback: (() -> Unit)? = null) {
+        val gattController: GATTController? = mapBLEGatt[address]
+
+        if (gattController != null) {
             CoroutineScope(Dispatchers.Main).launch {
                 try {
-                    withTimeout(5_000) { // 타임아웃을 2초로 설정
+                    withTimeout(5_000) { // 타임아웃 설정
                         suspendCancellableCoroutine<Unit> { continuation ->
-                            bluetoothGatt?.disconnect()
-                            bluetoothGatt?.close()
-                            Log.w(TAG, "disconnect success.")
-                            continuation.resume(Unit) // 성공적으로 종료되면 resume 호출
+                            gattController.bluetoothGatt.disconnect()
+
+                            // GATT 연결 상태가 변경될 때 resume 호출
+                            continuation.invokeOnCancellation {
+                                gattController.bluetoothGatt?.close()
+                            }
                         }
                     }
                 } catch (e: TimeoutCancellationException) {
@@ -333,21 +371,19 @@ object HCBle {
                 }
             }
         } else {
-            callback?.invoke() // GATT가 초기화되지 않은 경우에도 콜백 호출
+            callback?.invoke()
         }
     }
+
 
     /**
      * TODO: GATT Service 리스트를 반환합니다.
      * 블루투스가 연결되어 onServicesDiscovered 콜백이 호출 돼야 사용가능합니다.
      * @return
      */
-    fun getGattServiceList(): List<BluetoothGattService> {
-        if (HCBle::gattService.isInitialized.not()) {
-//            Log.e(TAG, "gattService is not initialized")
-            return emptyList()
-        }
-        return gattService.getGattServiceList()
+    fun getGattServiceList(deviceAddress: String): List<BluetoothGattService> {
+        val gattController: GATTController = mapBLEGatt[deviceAddress] ?: return emptyList()
+        return gattController.getGattServiceList()
     }
 
     /**
@@ -355,13 +391,12 @@ object HCBle {
      * 사용 하고자 하는 서비스 UUID를 설정합니다.
      * @param uuid
      */
-    fun setServiceUUID(uuid: String) {
-
-        if (bluetoothGatt != null) {
-            gattService.setServiceUUID(uuid)
-        } else {
-//            Log.e(TAG, "bluetoothGatt is not initialized")
+    fun setServiceUUID(deviceAddress: String, uuid: String) {
+        val gattController: GATTController = mapBLEGatt[deviceAddress] ?: run {
+            Log.e(TAG, "gattController is not initialized")
+            return
         }
+        gattController.setServiceUUID(uuid)
     }
 
     /**
@@ -369,16 +404,24 @@ object HCBle {
      * 사용 하고자 하는 캐릭터리스틱 UUID를 설정합니다.
      * @param characteristicUUID
      */
-    fun setCharacteristicUUID(characteristicUUID: String) {
-        gattService.setCharacteristicUUID(characteristicUUID)
+    fun setCharacteristicUUID(deviceAddress: String, characteristicUUID: String) {
+        val gattController: GATTController = mapBLEGatt[deviceAddress] ?: run {
+            Log.e(TAG, "gattController is not initialized")
+            return
+        }
+        gattController.setCharacteristicUUID(characteristicUUID)
     }
 
     /**
      * TODO: 캐릭터리스틱을 읽습니다.
      * setCharacteristicUUID로 설정된 캐릭터리스틱을 읽습니다.
      */
-    fun readCharacteristic() {
-        gattService.readCharacteristic()
+    fun readCharacteristic(deviceAddress: String) {
+        val gattController: GATTController = mapBLEGatt[deviceAddress] ?: run {
+            Log.e(TAG, "gattController is not initialized")
+            return
+        }
+        gattController.readCharacteristic()
     }
 
     /**
@@ -386,8 +429,12 @@ object HCBle {
      * setCharacteristicUUID로 설정된 캐릭터리스틱에 데이터를 쓰기합니다.
      * @param data
      */
-    fun writeCharacteristic(data: ByteArray) {
-        gattService.writeCharacteristic(data)
+    fun writeCharacteristic(deviceAddress: String, data: ByteArray) {
+        val gattController: GATTController = mapBLEGatt[deviceAddress] ?: run {
+            Log.e(TAG, "gattController is not initialized")
+            return
+        }
+        gattController.writeCharacteristic(data)
     }
 
     /**
@@ -395,20 +442,24 @@ object HCBle {
      * setCharacteristicUUID로 설정된 캐릭터리스틱에 알림을 설정합니다.
      * @param isEnable
      */
-    fun setCharacteristicNotification(isEnable: Boolean, isIndicate: Boolean = false) {
-        if (HCBle::gattService.isInitialized.not()) {
-            Log.e(TAG, "gattService is not initialized")
+    fun setCharacteristicNotification(
+        deviceAddress: String,
+        isEnable: Boolean,
+        isIndicate: Boolean = false
+    ) {
+        val gattController: GATTController = mapBLEGatt[deviceAddress] ?: run {
+            Log.e(TAG, "gattController is not initialized")
             return
         }
-        gattService.setCharacteristicNotification(isEnable, isIndicate)
+        gattController.setCharacteristicNotification(isEnable, isIndicate)
     }
 
-    fun readCharacteristicNotification() {
-        if (HCBle::gattService.isInitialized.not()) {
-            Log.e(TAG, "gattService is not initialized")
+    fun readCharacteristicNotification(deviceAddress: String) {
+        val gattController: GATTController = mapBLEGatt[deviceAddress] ?: run {
+            Log.e(TAG, "gattController is not initialized")
             return
         }
-        gattService.readCharacteristicNotification()
+        gattController.readCharacteristicNotification()
     }
 
     fun getBondedDevices(): List<BluetoothDevice> {

@@ -1,5 +1,6 @@
-package kr.co.hconnect.polihealth_sdk_android_v2_example.device_detail
+package kr.co.kmwdev.bluetooth_sdk_android_v2_example.device_detail
 
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
@@ -16,18 +17,11 @@ import androidx.appcompat.app.AppCompatActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kr.co.hconnect.polihealth_sdk_android_v2.BLEState
-import kr.co.hconnect.polihealth_sdk_android_v2.PoliBLE
-import kr.co.hconnect.polihealth_sdk_android.ProtocolType
-import kr.co.hconnect.polihealth_sdk_android.api.dto.response.BaseResponse
-import kr.co.hconnect.polihealth_sdk_android.api.dto.response.PoliResponse
-import kr.co.hconnect.polihealth_sdk_android.api.dto.response.SleepEndResponse
-import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily1Response
-import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily2Response
-import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily3Response
-import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.SleepResponse
-import kr.co.hconnect.polihealth_sdk_android_v2_example.characteristic_detail.CharacteristicDetailActivity
-import kr.co.hconnect.polihealth_sdk_android_v2_example.R
+import kr.co.hconnect.bluetooth_sdk_android.gatt.BLEState
+import kr.co.hconnect.bluetooth_sdk_android_v2.HCBle
+import kr.co.kmwdev.bluetooth_sdk_android_v2_example.characteristic_detail.CharacteristicDetailActivity
+import kr.co.hconnect.polihealth_sdk_android_v2_example.device_detail.CustomExpandableListAdapter
+import kr.co.kmwdev.bluetooth_sdk_android_v2_example.R
 
 class DeviceDetailActivity : AppCompatActivity() {
 
@@ -37,13 +31,18 @@ class DeviceDetailActivity : AppCompatActivity() {
     private val characteristicMap = mutableMapOf<String, List<BluetoothGattCharacteristic>>()
     private lateinit var tvStatus: TextView
     private lateinit var tvDeviceName: TextView
+    private var deviceAddress: String = ""
 
+    @SuppressLint("MissingPermission")
     @RequiresApi(Build.VERSION_CODES.Q)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_device_detail)
 
         val device: BluetoothDevice? = intent.getParcelableExtra("BLUETOOTH_DEVICE")
+        if (device != null) {
+            deviceAddress = device.address
+        }
         expandableListView = findViewById(R.id.expandableListView)
         tvStatus = findViewById(R.id.tv_status)
         tvDeviceName = findViewById(R.id.tv_device_name)
@@ -64,7 +63,7 @@ class DeviceDetailActivity : AppCompatActivity() {
         }
 
         btnDisconnect.setOnClickListener {
-            PoliBLE.disconnectDevice()
+            HCBle.disconnect(deviceAddress)
             tvStatus.text = "Status: Disconnected"
         }
     }
@@ -75,11 +74,12 @@ class DeviceDetailActivity : AppCompatActivity() {
 
         expandableListView.setOnChildClickListener { _, _, groupPosition, childPosition, _ ->
             val service = serviceList[groupPosition]
-            PoliBLE.setServiceUUID(service.uuid.toString())
+            HCBle.setServiceUUID(deviceAddress, service.uuid.toString())
             val characteristic = characteristicMap[service.uuid.toString()]?.get(childPosition)
-            PoliBLE.setCharacteristicUUID(characteristic?.uuid.toString())
+            HCBle.setCharacteristicUUID(deviceAddress, characteristic?.uuid.toString())
             characteristic?.let {
                 val intent = Intent(this, CharacteristicDetailActivity::class.java).apply {
+                    putExtra("DEVICE_ADDRESS", deviceAddress)
                     putExtra("CHARACTERISTIC_UUID", it.uuid.toString())
                 }
                 startActivity(intent)
@@ -90,42 +90,11 @@ class DeviceDetailActivity : AppCompatActivity() {
 
     @RequiresApi(Build.VERSION_CODES.Q)
     private fun connectToDevice(device: BluetoothDevice) {
-        PoliBLE.connectDevice(
-            this,
+        HCBle.connectToDevice(
             device,
-            onReceive = { type: ProtocolType, response: PoliResponse? ->
-                Log.d("DeviceDetailActivity", "onReceive: $type, $response")
-
-                when (response) {
-                    is Daily1Response -> {
-                        val daily1Response = response as Daily1Response
-//                        Log.d("DeviceDetailActivity", "Protocol1Response: $daily1Response")
-                    }
-
-                    is Daily2Response -> {
-                        val daily2Response = response as Daily2Response
-//                        Log.d("DeviceDetailActivity", "Protocol2Response: $daily2Response")
-                    }
-
-                    is Daily3Response -> {
-                        val daily3Response = response as Daily3Response
-//                        Log.d("DeviceDetailActivity", "Protocol3Response: $daily3Response")
-                    }
-
-                    is SleepResponse -> {
-                        val baseResponse = response as SleepResponse
-//                        Log.d("DeviceDetailActivity", "BaseResponse: $baseResponse")
-                    }
-
-                    is SleepEndResponse -> {
-                        val baseResponse = response as SleepEndResponse
-//                        Log.d("DeviceDetailActivity", "BaseResponse: $baseResponse")
-                    }
-
-                    is BaseResponse -> {
-                        val baseResponse = response as BaseResponse
-//                        Log.d("DeviceDetailActivity", "BaseResponse: $baseResponse")
-                    }
+            onReceive = { data ->
+                CoroutineScope(Dispatchers.Main).launch {
+                    Log.d("DeviceDetailActivity", "onReceive: $data")
                 }
             },
             onConnState = { state ->
@@ -148,7 +117,7 @@ class DeviceDetailActivity : AppCompatActivity() {
                             tvStatus.text = "Status: GATT Success"
                             serviceList.clear()
                             // 장치의 모든 서비스를 추가
-                            serviceList.addAll(PoliBLE.getGattServiceList())
+                            serviceList.addAll(HCBle.getGattServiceList(deviceAddress))
                             // 각 서비스의 특성을 매핑
                             for (service in serviceList) {
                                 characteristicMap[service.uuid.toString()] = service.characteristics

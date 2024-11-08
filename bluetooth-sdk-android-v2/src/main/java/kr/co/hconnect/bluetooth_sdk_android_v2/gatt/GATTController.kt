@@ -7,28 +7,24 @@ import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothGattService
 import android.os.Build
 import android.util.Log
+import kr.co.hconnect.bluetooth_sdk_android_v2.util.Logger
 import java.util.UUID
 
 @SuppressLint("MissingPermission")
-class GATTService(private val bluetoothGatt: BluetoothGatt) {
-    private lateinit var gattServiceList: List<BluetoothGattService>
-    private lateinit var _selService: BluetoothGattService
-    val selService: BluetoothGattService
-        get() = _selService
+class GATTController(val bluetoothGatt: BluetoothGatt) {
 
-    private lateinit var _selCharacteristic: BluetoothGattCharacteristic
-    val selCharacteristic: BluetoothGattCharacteristic
-        get() = _selCharacteristic
+    private lateinit var gattServiceList: List<BluetoothGattService>
+    lateinit var selService: BluetoothGattService
+    lateinit var selCharacteristic: BluetoothGattCharacteristic
 
     fun getGattServiceList(): List<BluetoothGattService> {
         try {
             if (::gattServiceList.isInitialized.not()) {
-                Log.e("GATTService", "Service list is empty")
-                throw Exception("Service list is empty")
+                throw Exception("getGattServiceList: gattServiceList is not initialized")
             }
             return gattServiceList
         } catch (e: Exception) {
-            Log.e("GATTService", "${e.message}")
+            Logger.e("getGattServiceList(): ${e.message}")
             throw e
         }
     }
@@ -40,56 +36,56 @@ class GATTService(private val bluetoothGatt: BluetoothGatt) {
     fun setServiceUUID(uuid: String) {
         try {
             if (::gattServiceList.isInitialized.not()) {
-                throw Exception("Service list is empty")
+                throw Exception("setServiceUUID: gattServiceList is not initialized")
             }
             gattServiceList.find { it.uuid.toString() == uuid }?.let {
-                Log.d("GATTService", "Service UUID: $uuid")
-                _selService = it
+                selService = it
+                Logger.d("setServiceUUID: $uuid")
             }
         } catch (e: Exception) {
-            Log.e("GATTService", "${e.message}")
+            Logger.e("setServiceUUID: ${e.message}")
         }
 
     }
 
     fun setCharacteristicUUID(characteristicUUID: String) {
         try {
-            if (::_selService.isInitialized.not()) {
+            if (::selService.isInitialized.not()) {
                 throw Exception("Service is not initialized")
             }
-            _selService.characteristics.find { it.uuid.toString() == characteristicUUID }?.let {
-                Log.d("GATTService", "Characteristic UUID: $characteristicUUID")
-                _selCharacteristic = it
+            selService.characteristics.find { it.uuid.toString() == characteristicUUID }?.let {
+                selCharacteristic = it
+                Logger.d("setCharacteristicUUID: $characteristicUUID")
             }
         } catch (e: Exception) {
-            Log.e("GATTService", "${e.message}")
+            Logger.e("setCharacteristicUUID: ${e.message}")
         }
     }
 
     fun readCharacteristic() {
-        bluetoothGatt.readCharacteristic(_selCharacteristic)
+        bluetoothGatt.readCharacteristic(selCharacteristic)
     }
 
     fun writeCharacteristic(data: ByteArray) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // API 33 이상
             bluetoothGatt.writeCharacteristic(
-                _selCharacteristic,
+                selCharacteristic,
                 data,
                 BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
             )
         } else { // API 32 이하
-            _selCharacteristic.value = data
-            bluetoothGatt.writeCharacteristic(_selCharacteristic)
+            selCharacteristic.value = data
+            bluetoothGatt.writeCharacteristic(selCharacteristic)
         }
     }
 
     fun setCharacteristicNotification(isEnable: Boolean, isIndicate: Boolean = false) {
         // 알림 또는 인디케이션 설정
-        bluetoothGatt.setCharacteristicNotification(_selCharacteristic, isEnable)
+        bluetoothGatt.setCharacteristicNotification(selCharacteristic, isEnable)
 
         // CCCD (Client Characteristic Configuration Descriptor) UUID
         val descriptor =
-            _selCharacteristic.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"))
+            selCharacteristic.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"))
 
         // Descriptor가 존재하는지 체크
         descriptor?.let {
@@ -112,7 +108,7 @@ class GATTService(private val bluetoothGatt: BluetoothGatt) {
 
     fun readCharacteristicNotification() {
         val descriptor =
-            _selCharacteristic.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"))
+            selCharacteristic.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"))
         bluetoothGatt.readDescriptor(descriptor)
     }
 }

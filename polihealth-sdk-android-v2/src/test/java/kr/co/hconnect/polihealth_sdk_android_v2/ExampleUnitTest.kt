@@ -1,17 +1,11 @@
 package kr.co.hconnect.polihealth_sdk_android_v2
 
 import io.ktor.client.request.get
-import io.ktor.client.request.post
-import io.ktor.util.KtorExperimentalAPI
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kr.co.hconnect.polihealth_sdk_android.PoliClient
-import kr.co.hconnect.polihealth_sdk_android.api.daily.DailyProtocol01API
 import kr.co.hconnect.polihealth_sdk_android.service.sleep.SleepApiService
-import kr.co.hconnect.polihealth_sdk_android_app.api.dto.request.LTMModel
 import org.junit.Test
-
-import org.junit.Assert.*
 
 /**
  * Example local unit test, which will execute on the development machine (host).
@@ -21,7 +15,8 @@ import org.junit.Assert.*
 class ExampleUnitTest {
     @Test
     fun protocol01API() = runBlocking {
-        PoliClient.init("https://mapi-stg.health-on.co.kr", "3270e7da-55b1-4dd4-abb9-5c71295b849b",
+        PoliClient.init(
+            "https://mapi-stg.health-on.co.kr", "3270e7da-55b1-4dd4-abb9-5c71295b849b",
             "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJpbmZyYSI6IkhlYWx0aE9uLVN0YWdpbmciLCJjbGllbnQtaWQiOiIzMjcwZTdkYS01NWIxLTRkZDQtYWJiOS01YzcxMjk1Yjg0OWIifQ.u0rBK-2t3l4RZ113EzudZsKb0Us9PEtiPcFDBv--gYdJf9yZJQOpo41XqzbgSdDa6Z1VDrgZXiOkIZOTeeaEYA"
         )
 
