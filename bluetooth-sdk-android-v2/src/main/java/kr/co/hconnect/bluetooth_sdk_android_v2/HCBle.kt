@@ -186,6 +186,11 @@ object HCBle {
         onReceive: ((characteristic: BluetoothGattCharacteristic) -> Unit)? = null,
         useBondingChangeState: Boolean = true
     ) {
+        if (mapBLEGatt[device.address] != null) {
+            Logger.e("Already connected to ${device.name}")
+            return
+        }
+        
         onBondState?.invoke(device.bondState)
         val bondStateReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
