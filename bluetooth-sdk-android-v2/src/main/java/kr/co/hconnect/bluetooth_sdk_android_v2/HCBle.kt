@@ -185,9 +185,9 @@ object HCBle {
         onReceive: ((characteristic: BluetoothGattCharacteristic) -> Unit)? = null,
         useBondingChangeState: Boolean = true
     ) {
-        if (mapBLEGatt[device.address] != null) {
+        if (mapBLEGatt[device.address] != null && mapBLEGatt[device.address]?.bluetoothGatt != null) {
             Logger.e("Already connected to ${device.name}")
-            onConnState?.invoke(BLEState.STATE_CONNECTED)
+            mapBLEGatt[device.address]?.bluetoothGatt?.connect()
             return
         }
 
