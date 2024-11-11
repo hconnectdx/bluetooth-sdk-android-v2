@@ -17,6 +17,11 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
     lateinit var selService: BluetoothGattService
     lateinit var selCharacteristic: BluetoothGattCharacteristic
 
+    fun disconnect() {
+        bluetoothGatt.disconnect()
+        bluetoothGatt.close()
+    }
+
     fun getGattServiceList(): List<BluetoothGattService> {
         try {
             if (::gattServiceList.isInitialized.not()) {

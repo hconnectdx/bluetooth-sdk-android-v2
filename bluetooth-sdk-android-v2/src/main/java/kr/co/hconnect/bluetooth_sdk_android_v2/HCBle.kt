@@ -357,20 +357,11 @@ object HCBle {
         if (gattController != null) {
             CoroutineScope(Dispatchers.Main).launch {
                 try {
-                    withTimeout(5_000) { // 타임아웃 설정
-                        suspendCancellableCoroutine<Unit> { continuation ->
-                            gattController.bluetoothGatt.disconnect()
-
-                            // GATT 연결 상태가 변경될 때 resume 호출
-                            continuation.invokeOnCancellation {
-                                gattController.bluetoothGatt.close()
-                            }
-                        }
-                    }
+                    gattController.disconnect()
+                    mapBLEGatt.remove(address)
                 } catch (e: TimeoutCancellationException) {
-                    Log.w(TAG, "Timeout during Bluetooth disconnect.")
+                    Logger.e("Disconnect error: ${e.message}")
                 } finally {
-                    delay(1_000)
                     callback?.invoke() // 연결 해제 후 콜백 호출
                 }
             }
