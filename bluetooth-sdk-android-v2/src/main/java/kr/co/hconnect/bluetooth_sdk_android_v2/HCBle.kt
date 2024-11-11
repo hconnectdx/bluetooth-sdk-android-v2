@@ -26,8 +26,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 import kr.co.hconnect.bluetooth_sdk_android.gatt.BLEState
-import kr.co.hconnect.bluetooth_sdk_android_v2.gatt.GATTService
-import kr.co.hconnect.bluetooth_sdk_android.scan.BleScanHandler
+import kr.co.hconnect.bluetooth_sdk_android_v2.scan.BleScanHandler
 import kr.co.hconnect.bluetooth_sdk_android_v2.gatt.GATTController
 import kr.co.hconnect.bluetooth_sdk_android_v2.gatt.GATTState
 import kr.co.hconnect.bluetooth_sdk_android_v2.util.Logger
@@ -190,7 +189,7 @@ object HCBle {
             Logger.e("Already connected to ${device.name}")
             return
         }
-        
+
         onBondState?.invoke(device.bondState)
         val bondStateReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
@@ -364,7 +363,7 @@ object HCBle {
 
                             // GATT 연결 상태가 변경될 때 resume 호출
                             continuation.invokeOnCancellation {
-                                gattController.bluetoothGatt?.close()
+                                gattController.bluetoothGatt.close()
                             }
                         }
                     }

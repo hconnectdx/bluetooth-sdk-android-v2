@@ -1,4 +1,4 @@
-package kr.co.hconnect.bluetooth_sdk_android.scan
+package kr.co.hconnect.bluetooth_sdk_android_v2.scan
 
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
