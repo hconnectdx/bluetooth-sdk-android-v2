@@ -187,7 +187,7 @@ object HCBle {
     ) {
         if (mapBLEGatt[device.address] != null) {
             Logger.e("Already connected to ${device.name}")
-            mapBLEGatt[device.address]?.bluetoothGatt?.discoverServices()
+            onConnState?.invoke(BLEState.STATE_CONNECTED)
             return
         }
 
