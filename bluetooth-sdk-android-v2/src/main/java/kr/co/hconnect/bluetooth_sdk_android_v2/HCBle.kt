@@ -187,6 +187,7 @@ object HCBle {
     ) {
         if (mapBLEGatt[device.address] != null) {
             Logger.e("Already connected to ${device.name}")
+            mapBLEGatt[device.address]?.bluetoothGatt?.discoverServices()
             return
         }
 
@@ -358,7 +359,6 @@ object HCBle {
             CoroutineScope(Dispatchers.Main).launch {
                 try {
                     gattController.disconnect()
-                    mapBLEGatt.remove(address)
                 } catch (e: TimeoutCancellationException) {
                     Logger.e("Disconnect error: ${e.message}")
                 } finally {
