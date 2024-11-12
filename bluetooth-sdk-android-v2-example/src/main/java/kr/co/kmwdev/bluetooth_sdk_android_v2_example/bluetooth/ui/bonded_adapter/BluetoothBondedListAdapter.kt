@@ -80,7 +80,9 @@ class BluetoothBondedListAdapter(
                 oldItem: BondModel,
                 newItem: BondModel
             ): Boolean {
-                return oldItem == newItem
+                return oldItem.state == newItem.state &&
+                        oldItem.bondState == newItem.bondState &&
+                        oldItem.device.address == newItem.device.address
             }
         }
     }
