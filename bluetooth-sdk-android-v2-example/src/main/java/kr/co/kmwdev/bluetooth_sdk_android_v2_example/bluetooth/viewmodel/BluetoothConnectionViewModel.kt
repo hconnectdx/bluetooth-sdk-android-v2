@@ -69,7 +69,7 @@ class BluetoothConnectionViewModel : ViewModel() {
             }
 
             // 스캔 리스트에 없다면 본딩 리스트를 탐색
-            if (updatedList.isEmpty()) {
+            if (updatedList.find { it.scanResult.device.address == selDevice.address } == null) {
                 setChangedBondState(selDevice, state, selDevice.bondState)
             } else {
                 adapter.submitList(updatedList) {
@@ -84,10 +84,6 @@ class BluetoothConnectionViewModel : ViewModel() {
         state: Int,
         bondState: Int
     ) {
-        if (state == BLEState.STATE_DISCONNECTED) {
-            HCBle.disconnect(selDevice.address)
-        }
-
         // 스캔 리스트에 아직 남아있는 경우
         val scannedAddressList = scanResults.value?.map { it.scanResult.device.address }
 
@@ -218,11 +214,11 @@ class BluetoothConnectionViewModel : ViewModel() {
             onReceive = {
                 Logger.d("Received data: $it")
             },
-            onBondState = { connState ->
-                val strConnState = BLEState.getStateString(connState)
+            onBondState = { bondState ->
+                val strConnState = BLEState.getStateString(bondState)
                 Logger.e("onBondState: $strConnState ${selDevice.name}")
 
-                when (connState) {
+                when (bondState) {
 
                     BLEState.BOND_NONE -> {
                         setChangedState(selDevice, BLEState.STATE_DISCONNECTED)
@@ -233,6 +229,7 @@ class BluetoothConnectionViewModel : ViewModel() {
 
                     BLEState.BOND_BONDED -> {
 
+
                         val bleState = if (HCBle.isConnect(selDevice)) {
                             BLEState.STATE_CONNECTED
                         } else {
@@ -242,7 +239,7 @@ class BluetoothConnectionViewModel : ViewModel() {
                         updateBondsState(
                             BondModel(
                                 state = bleState,
-                                bondState = BLEState.BOND_BONDED,
+                                bondState = bondState,
                                 device = selDevice
                             )
                         )

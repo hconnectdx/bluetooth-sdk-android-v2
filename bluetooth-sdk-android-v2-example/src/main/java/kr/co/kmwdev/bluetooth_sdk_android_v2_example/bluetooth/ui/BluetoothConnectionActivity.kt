@@ -103,10 +103,6 @@ class BluetoothConnectionActivity : AppCompatActivity() {
     private fun BluetoothConnectionViewModel.setBondedAdapterClickListener() {
         bondedAdapter = BluetoothBondedListAdapter { device ->
             Logger.d("click: $device")
-            val isConnected = HCBle.isConnected(device)
-            if (isConnected) {
-                viewModel.connect(device)
-            }
 
             when (HCBle.isConnect(device)) {
                 true -> {
