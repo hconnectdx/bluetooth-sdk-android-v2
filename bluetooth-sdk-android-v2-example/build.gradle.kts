@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "kr.co.kmwdev.bluetooth_sdk_android_v2_example"
-        minSdk = 24
+        minSdk = 27
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -32,6 +32,9 @@ android {
     }
     kotlinOptions {
         jvmTarget = "1.8"
+    }
+    buildFeatures {
+        dataBinding = true
     }
 }
 

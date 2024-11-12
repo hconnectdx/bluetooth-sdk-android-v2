@@ -1,13 +1,37 @@
-package kr.co.kmwdev.bluetooth_sdk_android_v2_example.permission
+package kr.co.kmwdev.bluetooth_sdk_android_v2_example.util
 
+import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 
-object PermissionManager {
+object MyPermission {
+
+    val PERMISSION_BLUETOOTH: Array<String>
+        get() {
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                arrayOf(
+                    Manifest.permission.BLUETOOTH,
+                    Manifest.permission.BLUETOOTH_SCAN,
+                    Manifest.permission.BLUETOOTH_ADMIN,
+                    Manifest.permission.BLUETOOTH_CONNECT,
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                )
+            } else {
+                arrayOf(
+                    Manifest.permission.BLUETOOTH,
+                    Manifest.permission.BLUETOOTH_ADMIN,
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                )
+            }
+        }
+
     private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
     private lateinit var resultCallback: (permissions: Map<String, Boolean>) -> Unit
 
@@ -19,10 +43,10 @@ object PermissionManager {
                 val permissionMap = mapOf<String, Boolean>()
                 permissions.forEach { p ->
                     if (p.value) {
-                        Log.d("PermissionManager", "Permission Granted: ${p.key}")
+                        Log.d("EasyPermission", "Permission Granted: ${p.key}")
                         permissionMap.plus(Pair(p.key, true))
                     } else {
-                        Log.e("PermissionManager", "Permission Denied: ${p.key}")
+                        Log.e("EasyPermission", "Permission Denied: ${p.key}")
                     }
                 }
                 resultCallback(permissions)
@@ -33,7 +57,7 @@ object PermissionManager {
         permissions: Array<String>,
         resultCallback: (permissions: Map<String, Boolean>) -> Unit
     ) {
-        PermissionManager.resultCallback = resultCallback
+        MyPermission.resultCallback = resultCallback
         permissionLauncher.launch(permissions)
     }
 

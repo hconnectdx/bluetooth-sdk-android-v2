@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">bluetooth-sdk-android-v2-example</string>
+    <string name="bluetooth_connection_title">블루투스 연동</string>
 </resources>
