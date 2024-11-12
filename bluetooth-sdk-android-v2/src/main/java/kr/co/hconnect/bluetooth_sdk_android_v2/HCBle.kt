@@ -350,6 +350,7 @@ object HCBle {
 
     /**
      * TODO: 디바이스와 연결을 해제합니다.
+     * TODO: 연결정보도 모두 삭제합니다. 이 메소드를 호출하면 자동연결 까지 해제 됩니다.
      * @param callback
      */
     fun disconnect(address: String, callback: (() -> Unit)? = null) {
@@ -359,6 +360,7 @@ object HCBle {
             CoroutineScope(Dispatchers.Main).launch {
                 try {
                     gattController.disconnect()
+                    mapBLEGatt.remove(address)
                 } catch (e: TimeoutCancellationException) {
                     Logger.e("Disconnect error: ${e.message}")
                 } finally {

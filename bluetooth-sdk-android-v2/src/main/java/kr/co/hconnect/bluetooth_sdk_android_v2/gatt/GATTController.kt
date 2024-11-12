@@ -19,7 +19,7 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
 
     fun disconnect() {
         bluetoothGatt.disconnect()
-//        bluetoothGatt.close()
+        bluetoothGatt.close()
     }
 
     fun getGattServiceList(): List<BluetoothGattService> {
