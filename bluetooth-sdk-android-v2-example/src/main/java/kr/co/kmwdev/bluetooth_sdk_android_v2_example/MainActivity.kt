@@ -18,8 +18,6 @@ class MainActivity : AppCompatActivity() {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
-        // 권한 획득
-        MyPermission.registerPermissionLauncher(this)
 
         findViewById<Button>(R.id.testButton).setOnClickListener {
             val intent = Intent(this, BluetoothConnectionActivity::class.java)

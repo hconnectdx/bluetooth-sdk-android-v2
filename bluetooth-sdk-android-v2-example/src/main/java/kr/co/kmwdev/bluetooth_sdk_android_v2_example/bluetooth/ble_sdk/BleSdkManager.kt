@@ -16,7 +16,11 @@ object BleSdkManager {
     /**
      * Start BLE scan
      */
-    fun startBleScan(onScanResult: (ScanResult) -> Unit, onScanStop: () -> Unit) {
+    fun startBleScan(
+        onScanResult: (ScanResult) -> Unit,
+        onScanStop: () -> Unit,
+        initBondedList: (() -> Unit)? = null
+    ) {
 
         val isGranted = MyPermission.isGrantedPermissions(
             MyApplication.getAppContext(),
@@ -39,6 +43,7 @@ object BleSdkManager {
                         Logger.e("Permission denied")
                     } else {
                         Logger.d("Permission granted")
+                        initBondedList?.invoke()
                         doScan(
                             onScanResult = { scanResult: ScanResult ->
                                 onScanResult.invoke(scanResult)

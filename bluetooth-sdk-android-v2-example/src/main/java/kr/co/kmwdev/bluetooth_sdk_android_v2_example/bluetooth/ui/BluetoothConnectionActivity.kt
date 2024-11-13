@@ -21,6 +21,7 @@ import kr.co.hconnect.snuh.mhd.bluetooth.viewmodel.BluetoothConnectionViewModel
 import kr.co.kmwdev.bluetooth_sdk_android_v2_example.util.Logger
 import kr.co.kmwdev.bluetooth_sdk_android_v2_example.R
 import kr.co.kmwdev.bluetooth_sdk_android_v2_example.databinding.ActivityBluetoothConnectionBinding
+import kr.co.kmwdev.bluetooth_sdk_android_v2_example.util.MyPermission
 
 
 @SuppressLint("MissingPermission")
@@ -30,6 +31,9 @@ class BluetoothConnectionActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 권한 획득
+        MyPermission.registerPermissionLauncher(this)
+
         viewModel = ViewModelProvider(this)[BluetoothConnectionViewModel::class.java]
 
         val binding: ActivityBluetoothConnectionBinding =
@@ -38,6 +42,7 @@ class BluetoothConnectionActivity : AppCompatActivity() {
         binding.vm = viewModel
         binding.lifecycleOwner = this
 
+
         BleSdkManager.init()
         setRecyclerView(binding)
         setBondedRecyclerView(binding)
@@ -45,6 +50,7 @@ class BluetoothConnectionActivity : AppCompatActivity() {
 
         viewModel.scanLeDevice()
     }
+
 
     private fun setBondedRecyclerView(binding: ActivityBluetoothConnectionBinding) {
         val recyclerView: RecyclerView = binding.recyclerViewBonded

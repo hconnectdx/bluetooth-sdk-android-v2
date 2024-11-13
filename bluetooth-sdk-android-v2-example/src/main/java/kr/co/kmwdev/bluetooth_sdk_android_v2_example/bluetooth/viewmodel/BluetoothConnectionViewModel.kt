@@ -33,7 +33,7 @@ class BluetoothConnectionViewModel : ViewModel() {
     lateinit var adapter: BluetoothScanListAdapter
     lateinit var bondedAdapter: BluetoothBondedListAdapter
 
-    fun updateScanningStatus(isScanning: Boolean) {
+    private fun updateScanningStatus(isScanning: Boolean) {
         this.isScanning.value = isScanning
     }
 
@@ -232,6 +232,9 @@ class BluetoothConnectionViewModel : ViewModel() {
                 onScanStop = {
                     Logger.d("Scan stopped")
                     updateScanningStatus(false)
+                },
+                initBondedList = {
+                    setInitBondedItems()
                 }
             )
         }
