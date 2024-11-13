@@ -65,9 +65,9 @@ class BluetoothConnectionViewModel : ViewModel() {
         selDevice: BluetoothDevice,
         state: Int
     ) {
-        if (state == BLEState.STATE_DISCONNECTED) {
-            HCBle.disconnect(selDevice.address)
-        }
+//        if (state == BLEState.STATE_DISCONNECTED) {
+//            HCBle.disconnect(selDevice.address)
+//        }
         scanResults.value?.let { scanResults ->
             val updatedList = scanResults.map {
                 if (it.scanResult.device.address == selDevice.address) {
@@ -384,27 +384,14 @@ class BluetoothConnectionViewModel : ViewModel() {
                     CoroutineScope(Dispatchers.Main).launch {
                         delay(300)
 
-                        val selBondModel =
-                            bondedDevices.value?.find { it.device.address == device.address }
-                        if (selBondModel?.state == BLEState.STATE_CONNECTING) {
-                            updateBondsState(
-                                BondModel(
-                                    BLEState.STATE_DISCONNECTED,
-                                    device.bondState,
-                                    device
-                                )
+                        updateBondsState(
+                            BondModel(
+                                BLEState.STATE_CONNECTING,
+                                device.bondState,
+                                device
                             )
-
-                        } else {
-                            updateBondsState(
-                                BondModel(
-                                    BLEState.STATE_CONNECTING,
-                                    device.bondState,
-                                    device
-                                )
-                            )
-                            connect(device)
-                        }
+                        )
+                        connect(device)
                     }
                 }
             }
