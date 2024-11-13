@@ -3,6 +3,7 @@ package kr.co.hconnect.snuh.mhd.bluetooth.viewmodel
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.le.ScanResult
+import android.util.Log
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.recyclerview.widget.DividerItemDecoration
@@ -51,7 +52,7 @@ class BluetoothConnectionViewModel : ViewModel() {
         }
     }
 
-    fun updateBondsState(bondModel: BondModel) {
+    private fun updateBondsState(bondModel: BondModel) {
 
         val device = bondModel.device
         val state = bondModel.state
@@ -65,11 +66,8 @@ class BluetoothConnectionViewModel : ViewModel() {
         selDevice: BluetoothDevice,
         state: Int
     ) {
-//        if (state == BLEState.STATE_DISCONNECTED) {
-//            HCBle.disconnect(selDevice.address)
-//        }
-        scanResults.value?.let { scanResults ->
-            val updatedList = scanResults.map {
+        scanResults.value?.let { currentList ->
+            val updatedList = currentList.map {
                 if (it.scanResult.device.address == selDevice.address) {
                     it.copy(state = state)
                 } else {
@@ -77,111 +75,109 @@ class BluetoothConnectionViewModel : ViewModel() {
                 }
             }
 
-            // 스캔 리스트에 없다면 본딩 리스트를 탐색
-            if (updatedList.find { it.scanResult.device.address == selDevice.address } == null) {
-                setChangedBondState(selDevice, state, selDevice.bondState)
-            } else {
+            if (updatedList.any { it.scanResult.device.address == selDevice.address }) {
                 adapter.submitList(updatedList) {
                     this.scanResults.value = updatedList.toMutableList()
                 }
+            } else {
+                setChangedBondState(selDevice, state, selDevice.bondState)
             }
         }
     }
+
 
     private fun setChangedBondState(
         selDevice: BluetoothDevice,
         state: Int,
         bondState: Int
     ) {
-        val scannedList = scanResults.value ?: mutableListOf()
         val currentBondedList = bondedDevices.value ?: mutableListOf()
 
-        // 본딩리스트에 남아 있으면서 본딩이 해지된 경우
-        // > 본딩 리스트에서 제거 한다.
-        if (currentBondedList.find { it.device.address == selDevice.address } != null &&
-            bondState == BLEState.BOND_NONE) {
-
-            currentBondedList.let { currentList ->
-                val updatedList = currentList.filter { it.device.address != selDevice.address }
-                bondedAdapter.submitList(updatedList)
-                this.bondedDevices.value?.clear()
-                this.bondedDevices.value = updatedList.toMutableList()
-
-            }
-        }
-
-        // 스캔 리스트에 아직 남아있는데 본딩 작업을 처리 해야 할 경우
-        val scannedAddressList = scannedList.map { it.scanResult.device.address }
-
-        if (scannedAddressList.contains(selDevice.address)) {
-            setChangedScanningBondState(selDevice, state, bondState)
-            return
-        }
-
-
-        // 스캔 리스트에 없고 경우 본딩 리스트에 있는 경우
-        // 본딩 리스트에서 변경된 디바이스를 찾아서 상태 변경
-        currentBondedList.let { currentList ->
-            // 기존 리스트에서 동일한 디바이스를 제외하고 새로운 상태의 아이템 추가
-            val updatedList = currentList.map {
-                if (it.device.address == selDevice.address) {
-                    it.copy(
+        // 본딩 리스트에서 상태 변경
+        val updatedBondedList = currentBondedList.filterNot {
+            it.device.address == selDevice.address
+        }.toMutableList().apply {
+            if (bondState != BLEState.BOND_NONE) {
+                add(
+                    BondModel(
+                        device = selDevice,
                         state = state,
                         bondState = bondState
                     )
-                } else {
-                    it
-                }
-            }.toMutableList()
-
-            // Adapter에 새로운 리스트 전달 및 LiveData 업데이트
-            bondedAdapter.submitList(updatedList)
+                )
+            }
         }
 
+        // 본딩 상태가 NONE이면 스캔 리스트를 유지하고, 아닌 경우 제거
+        if (bondState == BLEState.BOND_NONE) {
+            Log.d("BluetoothDebug", "Device unbonded and removed: ${selDevice.address}")
+        } else {
+            // 스캔 리스트에서 해당 디바이스 제거 및 상태 변경
+            setChangedScanningBondState(selDevice, state, bondState)
+        }
 
+        // 업데이트된 리스트를 어댑터 및 LiveData에 반영
+        bondedAdapter.submitList(updatedBondedList) {
+            this.bondedDevices.value = updatedBondedList
+        }
+
+        Log.d(
+            "BluetoothDebug",
+            "Updated bonded list: ${updatedBondedList.map { it.device.address }}"
+        )
     }
+
 
     private fun setChangedScanningBondState(
         selDevice: BluetoothDevice,
         state: Int,
         bondState: Int
     ) {
-        // 스캔 리스트에서 변경된 디바이스를 찾아서 상태 변경
-        scanResults.value?.let { currentList ->
-            // 기존 리스트를 복사하고 동일한 디바이스가 존재하면 업데이트, 없으면 추가
-            val updatedBondList = currentList.mapNotNull {
-                if (it.scanResult.device.address == selDevice.address) {
-                    BondModel(
-                        state = state,
-                        bondState = bondState,
-                        device = selDevice
-                    )
-                } else {
-                    null
-                }
-            }.toMutableList()
+        // 스캔된 리스트와 본딩된 리스트 가져오기
+        val scannedList = scanResults.value ?: mutableListOf()
+        val currentBondedList = bondedDevices.value ?: mutableListOf()
 
+        // 스캔 리스트에서 선택된 디바이스 제거
+        val updatedScannedList = scannedList.filterNot {
+            it.scanResult.device.address == selDevice.address
+        }.toMutableList()
 
-            // Adapter에 새로운 리스트 전달 및 LiveData 업데이트
-            updatedBondList.addAll(bondedDevices.value ?: mutableListOf())
-            bondedAdapter.submitList(updatedBondList) {
-                this.bondedDevices.value = updatedBondList
+        // 본딩 후, 본딩 리스트에 추가하거나 상태 업데이트
+        val updatedBondedList = currentBondedList.map {
+            if (it.device.address == selDevice.address) {
+                it.copy(state = state, bondState = bondState)
+            } else {
+                it
             }
+        }.toMutableList()
 
-
-            val updatedScannedList = currentList.mapNotNull {
-                if (it.scanResult.device.address == selDevice.address) {
-                    null
-                } else {
-                    it
-                }
-            }.toMutableList()
-
-            adapter.submitList(updatedScannedList) {
-                this.scanResults.value = updatedScannedList
-            }
+        // 본딩 리스트에 없으면 새로운 장치 추가
+        if (updatedBondedList.none { it.device.address == selDevice.address } && bondState != BLEState.BOND_NONE) {
+            updatedBondedList.add(
+                BondModel(
+                    device = selDevice,
+                    state = state,
+                    bondState = bondState
+                )
+            )
         }
+
+        // 본딩 상태가 해제된 경우(본딩 후 실패 또는 해제 시)
+        if (bondState == BLEState.BOND_NONE) {
+            updatedBondedList.removeAll { it.device.address == selDevice.address }
+        }
+
+        // LiveData 및 Adapter 업데이트
+        bondedAdapter.submitList(updatedBondedList) {
+            this.bondedDevices.value = updatedBondedList
+        }
+
+        adapter.submitList(updatedScannedList) {
+            this.scanResults.value = updatedScannedList
+        }
+
     }
+
 
     @SuppressLint("MissingPermission")
     private fun addDevice(scanResult: ScanResult) {
@@ -306,7 +302,11 @@ class BluetoothConnectionViewModel : ViewModel() {
                     BLEState.STATE_DISCONNECTED -> {
                         Logger.e("Disconnected from ${selDevice.name}")
                         setChangedState(selDevice, BLEState.STATE_DISCONNECTED)
+                    }
 
+                    BLEState.STATE_DISCONNECTING -> {
+                        Logger.e("Disconnecting from ${selDevice.name}")
+                        setChangedState(selDevice, BLEState.STATE_DISCONNECTING)
                     }
 
                     BLEState.STATE_CONNECTING -> {

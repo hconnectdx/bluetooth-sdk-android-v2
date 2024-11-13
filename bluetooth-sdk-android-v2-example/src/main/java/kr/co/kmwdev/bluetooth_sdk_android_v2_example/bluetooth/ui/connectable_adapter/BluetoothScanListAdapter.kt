@@ -38,7 +38,7 @@ class BluetoothScanListAdapter(
                 }
 
                 BLEState.STATE_DISCONNECTING -> {
-                    binding.status.text = "disconnecting"
+                    binding.status.text = "Disconnecting"
                     binding.status.visibility = View.VISIBLE
                 }
 
