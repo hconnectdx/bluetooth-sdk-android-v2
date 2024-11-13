@@ -134,6 +134,7 @@ class BluetoothConnectionActivity : AppCompatActivity() {
     private fun setOnClickListener(binding: ActivityBluetoothConnectionBinding) {
         binding.scanRefresh.setOnClickListener {
             viewModel.scanLeDevice()
+            viewModel.setInitBondedItems()
         }
     }
 

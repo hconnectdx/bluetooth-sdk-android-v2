@@ -94,25 +94,32 @@ class BluetoothConnectionViewModel : ViewModel() {
         val currentBondedList = bondedDevices.value ?: mutableListOf()
 
         // 본딩 리스트에서 상태 변경
-        val updatedBondedList = currentBondedList.filterNot {
-            it.device.address == selDevice.address
-        }.toMutableList().apply {
-            if (bondState != BLEState.BOND_NONE) {
-                add(
-                    BondModel(
-                        device = selDevice,
-                        state = state,
-                        bondState = bondState
-                    )
-                )
+        val updatedBondedList = currentBondedList.map {
+            if (it.device.address == selDevice.address) {
+                // 기존 객체를 복사하여 상태를 업데이트
+                it.copy(state = state, bondState = bondState)
+            } else {
+                it
             }
+        }.toMutableList()
+
+        // 본딩 리스트에 없고 && 본딩 상태가 아닌 디바이스를 추가
+        if (updatedBondedList.none { it.device.address == selDevice.address } && bondState != BLEState.BOND_NONE) {
+            updatedBondedList.add(
+                BondModel(
+                    device = selDevice,
+                    state = state,
+                    bondState = bondState
+                )
+            )
         }
 
-        // 본딩 상태가 NONE이면 스캔 리스트를 유지하고, 아닌 경우 제거
+        // 본딩 상태가 NONE이면 스캔 리스트를 유지하고 (본딩 기능이 없는 장치)
+        // 본딩 상태가 NONE이 아니면 스캔 리스트에서 해당 디바이스 제거 (본딩 기능 있는 장치)
         if (bondState == BLEState.BOND_NONE) {
             Log.d("BluetoothDebug", "Device unbonded and removed: ${selDevice.address}")
+
         } else {
-            // 스캔 리스트에서 해당 디바이스 제거 및 상태 변경
             setChangedScanningBondState(selDevice, state, bondState)
         }
 
@@ -344,6 +351,7 @@ class BluetoothConnectionViewModel : ViewModel() {
                 MyPermission.PERMISSION_BLUETOOTH
             )
         ) {
+            bondedDevices.value?.clear()
             val bondedList = HCBle.getBondedDevices().toMutableList()
             if (bondedList.isEmpty()) return true
             val filteredBondedList = bondedList.map { device ->
