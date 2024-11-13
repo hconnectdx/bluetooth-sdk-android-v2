@@ -132,8 +132,11 @@ class BluetoothConnectionActivity : AppCompatActivity() {
                 viewModel.updateScanningStatus(true)
                 viewModel.scanLeDevice()
             }
-
-
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        viewModel.scanStop()
     }
 }

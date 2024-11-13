@@ -230,6 +230,10 @@ class BluetoothConnectionViewModel : ViewModel() {
         )
     }
 
+    fun scanStop() {
+        BleSdkManager.stopBleScan()
+    }
+
     @SuppressLint("MissingPermission")
     fun connect(selDevice: BluetoothDevice) {
         HCBle.connectToDevice(
