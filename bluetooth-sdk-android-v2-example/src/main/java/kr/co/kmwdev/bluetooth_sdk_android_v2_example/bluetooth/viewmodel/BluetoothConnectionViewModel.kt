@@ -220,26 +220,33 @@ class BluetoothConnectionViewModel : ViewModel() {
 
     @SuppressLint("MissingPermission")
     fun scanLeDevice() {
-
         if (isScanning.value == false) {
-            scanResults.value?.clear()
-            adapter.submitList(emptyList())
-            updateScanningStatus(true)
+            // CONNECTED 상태의 디바이스를 유지하기 위해 필터링
+            val connectedDevices =
+                scanResults.value?.filter { it.state == BLEState.STATE_CONNECTED }?.toMutableList()
+                    ?: mutableListOf()
 
-            BleSdkManager.startBleScan(
-                onScanResult = { scanResult ->
-                    if (!scanResult.device.name.isNullOrBlank()) {
-                        addDevice(scanResult)
+            // 기존 리스트를 clear하고 CONNECTED 상태의 디바이스만 유지
+            scanResults.value = connectedDevices
+            adapter.submitList(connectedDevices) {
+                updateScanningStatus(true)
+
+                // BLE 스캔 시작
+                BleSdkManager.startBleScan(
+                    onScanResult = { scanResult ->
+                        if (!scanResult.device.name.isNullOrBlank()) {
+                            addDevice(scanResult)
+                        }
+                    },
+                    onScanStop = {
+                        Logger.d("Scan stopped")
+                        updateScanningStatus(false)
+                    },
+                    initBondedList = {
+                        setInitBondedItems()
                     }
-                },
-                onScanStop = {
-                    Logger.d("Scan stopped")
-                    updateScanningStatus(false)
-                },
-                initBondedList = {
-                    setInitBondedItems()
-                }
-            )
+                )
+            }
         }
     }
 
