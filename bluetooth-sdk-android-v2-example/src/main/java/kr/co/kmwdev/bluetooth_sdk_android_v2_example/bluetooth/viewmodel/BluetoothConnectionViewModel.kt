@@ -217,17 +217,24 @@ class BluetoothConnectionViewModel : ViewModel() {
 
     @SuppressLint("MissingPermission")
     fun scanLeDevice() {
-        BleSdkManager.startBleScan(
-            onScanResult = { scanResult ->
-                if (!scanResult.device.name.isNullOrBlank()) {
-                    addDevice(scanResult)
+
+        if (isScanning.value == false) {
+            scanResults.value?.clear()
+            adapter.submitList(emptyList())
+            updateScanningStatus(true)
+
+            BleSdkManager.startBleScan(
+                onScanResult = { scanResult ->
+                    if (!scanResult.device.name.isNullOrBlank()) {
+                        addDevice(scanResult)
+                    }
+                },
+                onScanStop = {
+                    Logger.d("Scan stopped")
+                    updateScanningStatus(false)
                 }
-            },
-            onScanStop = {
-                Logger.d("Scan stopped")
-                updateScanningStatus(false)
-            }
-        )
+            )
+        }
     }
 
     fun scanStop() {

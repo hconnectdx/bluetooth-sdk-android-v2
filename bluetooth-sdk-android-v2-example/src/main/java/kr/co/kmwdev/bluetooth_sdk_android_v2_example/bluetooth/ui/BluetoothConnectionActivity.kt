@@ -42,6 +42,8 @@ class BluetoothConnectionActivity : AppCompatActivity() {
         setRecyclerView(binding)
         setBondedRecyclerView(binding)
         setOnClickListener(binding)
+
+        viewModel.scanLeDevice()
     }
 
     private fun setBondedRecyclerView(binding: ActivityBluetoothConnectionBinding) {
@@ -125,13 +127,7 @@ class BluetoothConnectionActivity : AppCompatActivity() {
 
     private fun setOnClickListener(binding: ActivityBluetoothConnectionBinding) {
         binding.scanRefresh.setOnClickListener {
-
-            if (viewModel.isScanning.value == false) {
-                viewModel.scanResults.value?.clear()
-                viewModel.adapter.submitList(emptyList())
-                viewModel.updateScanningStatus(true)
-                viewModel.scanLeDevice()
-            }
+            viewModel.scanLeDevice()
         }
     }
 
