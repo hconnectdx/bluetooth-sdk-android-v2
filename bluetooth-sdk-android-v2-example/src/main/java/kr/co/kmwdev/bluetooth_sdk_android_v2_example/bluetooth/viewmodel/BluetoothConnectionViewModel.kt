@@ -136,7 +136,6 @@ class BluetoothConnectionViewModel : ViewModel() {
 
             // Adapter에 새로운 리스트 전달 및 LiveData 업데이트
             bondedAdapter.submitList(updatedList)
-            this.bondedDevices.value = updatedList // 두번째 작동 갑자기 안함ㄴ
         }
 
 
