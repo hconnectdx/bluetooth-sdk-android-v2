@@ -116,12 +116,13 @@ class BluetoothConnectionActivity : AppCompatActivity() {
             recyclerView.adapter = adapter
             recyclerView.layoutManager = LinearLayoutManager(this@BluetoothConnectionActivity)
 
-            // Divider 추가
-            val dividerItemDecoration = DividerItemDecoration(
+            // Custom Divider 적용
+            val customDivider = CustomDividerItemDecoration(
                 recyclerView.context,
                 (recyclerView.layoutManager as LinearLayoutManager).orientation
             )
-            recyclerView.addItemDecoration(dividerItemDecoration)
+            recyclerView.addItemDecoration(customDivider)
+            
             scanResults.observe(this@BluetoothConnectionActivity) { scanResultModels ->
                 Logger.d("Scan result updated $scanResultModels")
                 adapter.submitList(
@@ -135,6 +136,9 @@ class BluetoothConnectionActivity : AppCompatActivity() {
         binding.scanRefresh.setOnClickListener {
             viewModel.scanLeDevice()
             viewModel.setInitBondedItems()
+        }
+        binding.backButton.setOnClickListener {
+            finish()
         }
     }
 

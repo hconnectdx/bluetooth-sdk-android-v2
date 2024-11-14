@@ -20,6 +20,7 @@ import kr.co.kmwdev.bluetooth_sdk_android_v2_example.bluetooth.ble_sdk.BleSdkMan
 import kr.co.kmwdev.bluetooth_sdk_android_v2_example.bluetooth.model.BondModel
 import kr.co.kmwdev.bluetooth_sdk_android_v2_example.bluetooth.ui.connectable_adapter.BluetoothScanListAdapter
 import kr.co.kmwdev.bluetooth_sdk_android_v2_example.bluetooth.model.ScanResultModel
+import kr.co.kmwdev.bluetooth_sdk_android_v2_example.bluetooth.ui.CustomDividerItemDecoration
 import kr.co.kmwdev.bluetooth_sdk_android_v2_example.bluetooth.ui.bonded_adapter.BluetoothBondedListAdapter
 import kr.co.kmwdev.bluetooth_sdk_android_v2_example.util.Logger
 import kr.co.kmwdev.bluetooth_sdk_android_v2_example.util.MyPermission
@@ -382,12 +383,12 @@ class BluetoothConnectionViewModel : ViewModel() {
         recyclerView.adapter = bondedAdapter
         recyclerView.layoutManager = LinearLayoutManager(MyApplication.getAppContext())
 
-        // Divider 추가
-        val dividerItemDecoration = DividerItemDecoration(
+        // Custom Divider 적용
+        val customDivider = CustomDividerItemDecoration(
             recyclerView.context,
             (recyclerView.layoutManager as LinearLayoutManager).orientation
         )
-        recyclerView.addItemDecoration(dividerItemDecoration)
+        recyclerView.addItemDecoration(customDivider)
     }
 
     @SuppressLint("MissingPermission")

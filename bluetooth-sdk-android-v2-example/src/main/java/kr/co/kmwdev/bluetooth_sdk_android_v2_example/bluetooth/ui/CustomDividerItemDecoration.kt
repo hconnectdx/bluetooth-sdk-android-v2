@@ -1,46 +1,72 @@
 package kr.co.kmwdev.bluetooth_sdk_android_v2_example.bluetooth.ui
 
+import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Rect
 import android.graphics.drawable.Drawable
-import android.view.View
 import androidx.recyclerview.widget.RecyclerView
 
-class CustomDividerRadiusItemDecoration(
-    private val topRadiusDrawable: Drawable,
-    private val bottomRadiusDrawable: Drawable,
-    private val dividerDrawable: Drawable
+class CustomDividerItemDecoration(
+    context: Context,
+    orientation: Int
 ) : RecyclerView.ItemDecoration() {
 
-    override fun onDrawOver(canvas: Canvas, parent: RecyclerView, state: RecyclerView.State) {
-        val childCount = parent.childCount
-        for (i in 0 until childCount) {
-            val child = parent.getChildAt(i)
-            val layoutParams = child.layoutParams as RecyclerView.LayoutParams
+    private val divider: Drawable?
 
-            // 첫 번째 아이템에만 상단 라운드 배경 적용
-            if (i == 0) {
-                val left = child.left - layoutParams.leftMargin
-                val right = child.right + layoutParams.rightMargin
-                val top = child.top - layoutParams.topMargin
-                val bottom = child.bottom + layoutParams.bottomMargin
+    init {
+        val attrs = context.obtainStyledAttributes(intArrayOf(android.R.attr.listDivider))
+        divider = attrs.getDrawable(0)
+        attrs.recycle()
+        setOrientation(orientation)
+    }
 
-                topRadiusDrawable.setBounds(left, top, right, bottom)
-                topRadiusDrawable.draw(canvas)
-            }
+    private var orientation: Int = orientation
 
+    private fun setOrientation(orientation: Int) {
+        require(!(orientation != RecyclerView.VERTICAL && orientation != RecyclerView.HORIZONTAL)) {
+            "Invalid orientation"
+        }
+        this.orientation = orientation
+    }
+
+    override fun onDraw(canvas: Canvas, parent: RecyclerView, state: RecyclerView.State) {
+        if (parent.layoutManager == null || divider == null) {
+            return
+        }
+
+        if (orientation == RecyclerView.VERTICAL) {
+            drawVerticalDividers(canvas, parent)
+        } else {
+            drawHorizontalDividers(canvas, parent)
         }
     }
 
-    override fun getItemOffsets(
-        outRect: Rect,
-        view: View,
-        parent: RecyclerView,
-        state: RecyclerView.State
-    ) {
-        val position = parent.getChildAdapterPosition(view)
-        if (position < state.itemCount - 1) {
-            outRect.bottom = dividerDrawable.intrinsicHeight
+    private fun drawVerticalDividers(canvas: Canvas, parent: RecyclerView) {
+        val left = parent.paddingLeft
+        val right = parent.width - parent.paddingRight
+
+        val childCount = parent.childCount
+        for (i in 0 until childCount - 1) { // 마지막 아이템 제외
+            val child = parent.getChildAt(i)
+            val params = child.layoutParams as RecyclerView.LayoutParams
+            val top = child.bottom + params.bottomMargin
+            val bottom = top + (divider?.intrinsicHeight ?: 0)
+            divider?.setBounds(left, top, right, bottom)
+            divider?.draw(canvas)
+        }
+    }
+
+    private fun drawHorizontalDividers(canvas: Canvas, parent: RecyclerView) {
+        val top = parent.paddingTop
+        val bottom = parent.height - parent.paddingBottom
+
+        val childCount = parent.childCount
+        for (i in 0 until childCount - 1) { // 마지막 아이템 제외
+            val child = parent.getChildAt(i)
+            val params = child.layoutParams as RecyclerView.LayoutParams
+            val left = child.right + params.rightMargin
+            val right = left + (divider?.intrinsicWidth ?: 0)
+            divider?.setBounds(left, top, right, bottom)
+            divider?.draw(canvas)
         }
     }
 }
