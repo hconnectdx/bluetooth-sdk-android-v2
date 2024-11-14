@@ -7,7 +7,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import kr.co.kmwdev.bluetooth_sdk_android_v2_example.bluetooth.ui.BluetoothConnectionActivity
-import kr.co.kmwdev.bluetooth_sdk_android_v2_example.util.MyPermission
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

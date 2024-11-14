@@ -486,5 +486,7 @@ object HCBle {
         }
     }
 
-
+    fun getBluetoothDeviceByAddress(address: String): BluetoothDevice? {
+        return bluetoothAdapter.getRemoteDevice(address)
+    }
 }

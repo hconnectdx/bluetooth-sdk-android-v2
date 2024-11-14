@@ -1,4 +1,9 @@
 <resources>
     <string name="app_name">bluetooth-sdk-android-v2-example</string>
     <string name="bluetooth_connection_title">블루투스 연동</string>
+    <string name="bluetooth_connection_connecting">연결 중…</string>
+    <string name="bluetooth_connection_connected">연결 됨</string>
+    <string name="bluetooth_connection_disconnecting">해제 중…</string>
+    <string name="title_bonded_device">등록된 디바이스</string>
+    <string name="title_connectable_device">연결 가능한 디바이스</string>
 </resources>

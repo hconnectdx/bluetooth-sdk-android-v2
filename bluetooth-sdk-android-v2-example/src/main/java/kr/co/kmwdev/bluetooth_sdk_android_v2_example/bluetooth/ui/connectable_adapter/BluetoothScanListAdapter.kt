@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.RecyclerView
 
 import androidx.recyclerview.widget.ListAdapter
 import kr.co.hconnect.bluetooth_sdk_android.gatt.BLEState
+import kr.co.kmwdev.bluetooth_sdk_android_v2_example.R
 import kr.co.kmwdev.bluetooth_sdk_android_v2_example.bluetooth.model.ScanResultModel
 import kr.co.kmwdev.bluetooth_sdk_android_v2_example.databinding.ItemBluetoothDeviceBinding
 
@@ -28,17 +29,20 @@ class BluetoothScanListAdapter(
 
             when (state) {
                 BLEState.STATE_CONNECTED -> {
-                    binding.status.text = "Connected"
+                    binding.status.text =
+                        binding.root.context.getString(R.string.bluetooth_connection_connected)
                     binding.status.visibility = View.VISIBLE
                 }
 
                 BLEState.STATE_CONNECTING -> {
-                    binding.status.text = "Connecting"
+                    binding.status.text =
+                        binding.root.context.getString(R.string.bluetooth_connection_connecting)
                     binding.status.visibility = View.VISIBLE
                 }
 
                 BLEState.STATE_DISCONNECTING -> {
-                    binding.status.text = "Disconnecting"
+                    binding.status.text =
+                        binding.root.context.getString(R.string.bluetooth_connection_disconnecting)
                     binding.status.visibility = View.VISIBLE
                 }
 

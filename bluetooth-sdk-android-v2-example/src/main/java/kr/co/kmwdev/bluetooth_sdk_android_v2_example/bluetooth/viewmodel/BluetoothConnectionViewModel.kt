@@ -3,10 +3,10 @@ package kr.co.hconnect.snuh.mhd.bluetooth.viewmodel
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.le.ScanResult
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.CoroutineScope
@@ -24,6 +24,7 @@ import kr.co.kmwdev.bluetooth_sdk_android_v2_example.bluetooth.ui.CustomDividerI
 import kr.co.kmwdev.bluetooth_sdk_android_v2_example.bluetooth.ui.bonded_adapter.BluetoothBondedListAdapter
 import kr.co.kmwdev.bluetooth_sdk_android_v2_example.util.Logger
 import kr.co.kmwdev.bluetooth_sdk_android_v2_example.util.MyPermission
+import kr.co.kmwdev.bluetooth_sdk_android_v2_example.util.MySharedPref
 
 class BluetoothConnectionViewModel : ViewModel() {
     val isScanning = MutableLiveData(false)
@@ -245,6 +246,7 @@ class BluetoothConnectionViewModel : ViewModel() {
                     },
                     initBondedList = {
                         setInitBondedItems()
+                        setInitConnectedItems()
                     }
                 )
             }
@@ -269,7 +271,8 @@ class BluetoothConnectionViewModel : ViewModel() {
                 when (bondState) {
 
                     BLEState.BOND_NONE -> {
-                        if (bondedDevices.value?.find { it.device.address == selDevice.address } != null) {
+                        val isConnect = HCBle.isConnect(selDevice)
+                        if (bondedDevices.value?.find { it.device.address == selDevice.address } != null && !isConnect) {
                             updateBondsState(
                                 BondModel(
                                     state = BLEState.STATE_DISCONNECTED,
@@ -312,6 +315,9 @@ class BluetoothConnectionViewModel : ViewModel() {
                     BLEState.STATE_CONNECTED -> {
                         Logger.e("Connected to ${selDevice.name}")
                         setChangedState(selDevice, BLEState.STATE_CONNECTED)
+                        // 로컬DB에 BluetoothDevice 객체 저장
+
+                        saveDeviceAddress(selDevice.address)
                     }
 
                     BLEState.STATE_DISCONNECTED -> {
@@ -333,11 +339,6 @@ class BluetoothConnectionViewModel : ViewModel() {
             },
             onGattServiceState = { gattState ->
                 Logger.d("onGattServiceState: ${BLEState.getStateString(gattState)}")
-//                if (gattState == BLEState.STATE_CONNECTED) {
-//                    setChangedState(selDevice, BLEState.STATE_CONNECTED)
-//                } else {
-//                    setChangedState(selDevice, BLEState.STATE_DISCONNECTED)
-//                }
             },
             onSubscriptionState = {
                 Logger.e("onSubscriptionState: $it")
@@ -350,6 +351,32 @@ class BluetoothConnectionViewModel : ViewModel() {
             },
             useBondingChangeState = true,
         )
+    }
+
+    fun setInitConnectedItems() {
+        if (MyPermission.isGrantedPermissions(
+                MyApplication.getAppContext(),
+                MyPermission.PERMISSION_BLUETOOTH
+            )
+        ) {
+            val connectedAddressSet = getDeviceAddressSet()
+            val connectedAddressList = connectedAddressSet.toMutableList()
+            val connectedDeviceList = connectedAddressList.map { address ->
+                HCBle.getBluetoothDeviceByAddress(address)
+            }
+
+            connectedDeviceList.forEach { device ->
+                if (device != null) {
+//                    connect(device)
+                    HCBle.isConnect(device).let {
+                        val state =
+                            if (it) BLEState.STATE_CONNECTED else BLEState.STATE_DISCONNECTED
+                        Logger.d("Connected device: ${device.name} $state")
+                        setChangedState(device, state)
+                    }
+                }
+            }
+        }
     }
 
     @SuppressLint("MissingPermission")
@@ -425,6 +452,18 @@ class BluetoothConnectionViewModel : ViewModel() {
                 }
             }
         }
+    }
+
+    private fun saveDeviceAddress(address: String) {
+        MySharedPref.saveBLEAddress(address = address)
+    }
+
+    private fun getDeviceAddressSet(): Set<String> {
+        return MySharedPref.getBLEAddresses()
+    }
+
+    private fun removeDeviceAddress(address: String) {
+        MySharedPref.removeBLEAddress(address = address)
     }
 
 
