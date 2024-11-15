@@ -6,6 +6,7 @@ import android.bluetooth.le.ScanResult
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 
@@ -33,22 +34,27 @@ class BluetoothScanListAdapter(
                     binding.status.text =
                         binding.root.context.getString(R.string.bluetooth_connection_connected)
                     binding.status.visibility = View.VISIBLE
+                    setStatusTextColor(R.color.primary)
+
                 }
 
                 BLEState.STATE_CONNECTING -> {
                     binding.status.text =
                         binding.root.context.getString(R.string.bluetooth_connection_connecting)
                     binding.status.visibility = View.VISIBLE
+                    setStatusTextColor(R.color.gray70)
                 }
 
                 BLEState.STATE_DISCONNECTING -> {
                     binding.status.text =
                         binding.root.context.getString(R.string.bluetooth_connection_disconnecting)
                     binding.status.visibility = View.VISIBLE
+                    setStatusTextColor(R.color.gray70)
                 }
 
                 else -> {
                     binding.status.visibility = View.GONE
+                    setStatusTextColor(R.color.gray70)
                 }
             }
 
@@ -56,6 +62,15 @@ class BluetoothScanListAdapter(
                 onClick(device)
             }
             binding.executePendingBindings()
+        }
+
+        private fun setStatusTextColor(res: Int = R.color.gray70) {
+            binding.name.setTextColor(
+                ContextCompat.getColor(
+                    binding.root.context,
+                    res
+                )
+            )
         }
     }
 

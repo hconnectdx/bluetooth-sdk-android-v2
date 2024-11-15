@@ -14,8 +14,8 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:layout_constraintTop_toTopOf="parent"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            app:layout_constraintTop_toTopOf="parent">
 
             <TextView
                 android:id="@+id/name"
@@ -28,9 +28,9 @@
                 android:id="@+id/status"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="15sp"
                 android:layout_marginTop="4dp"
-                android:textColor="#adadad"
+                android:textColor="@color/gray"
+                android:textSize="15sp"
                 android:visibility="gone"
                 tools:text="연결됨"
                 tools:visibility="visible" />
