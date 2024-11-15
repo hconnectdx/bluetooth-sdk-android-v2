@@ -1,6 +1,7 @@
 package kr.co.kmwdev.bluetooth_sdk_android_v2_example.bluetooth.ui.connectable_adapter
 
 import android.annotation.SuppressLint
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.le.ScanResult
 import android.view.LayoutInflater
 import android.view.View
@@ -15,17 +16,17 @@ import kr.co.kmwdev.bluetooth_sdk_android_v2_example.bluetooth.model.ScanResultM
 import kr.co.kmwdev.bluetooth_sdk_android_v2_example.databinding.ItemBluetoothDeviceBinding
 
 class BluetoothScanListAdapter(
-    private val onDeviceClick: (ScanResult) -> Unit
+    private val onDeviceClick: (BluetoothDevice) -> Unit
 ) : ListAdapter<ScanResultModel, BluetoothScanListAdapter.ViewHolder>(DIFF_CALLBACK) {
 
     class ViewHolder(private val binding: ItemBluetoothDeviceBinding) :
         RecyclerView.ViewHolder(binding.root) {
 
         @SuppressLint("MissingPermission")
-        fun bind(scanResultModel: ScanResultModel, onClick: (ScanResult) -> Unit) {
+        fun bind(scanResultModel: ScanResultModel, onClick: (BluetoothDevice) -> Unit) {
             val state = scanResultModel.state
-            val scanResult = scanResultModel.scanResult
-            binding.name.text = scanResult.device.name ?: "Unknown Device"
+            val device = scanResultModel.device
+            binding.name.text = device.name ?: "Unknown Device"
 
             when (state) {
                 BLEState.STATE_CONNECTED -> {
@@ -52,7 +53,7 @@ class BluetoothScanListAdapter(
             }
 
             binding.root.setOnClickListener {
-                onClick(scanResult)
+                onClick(device)
             }
             binding.executePendingBindings()
         }
@@ -74,7 +75,7 @@ class BluetoothScanListAdapter(
                 oldItem: ScanResultModel,
                 newItem: ScanResultModel
             ): Boolean {
-                return oldItem.scanResult.device.address == newItem.scanResult.device.address
+                return oldItem.device.address == newItem.device.address
             }
 
             override fun areContentsTheSame(

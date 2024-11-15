@@ -43,13 +43,13 @@ class BluetoothConnectionViewModel : ViewModel() {
     fun updateScanningResultsState(scanResultModel: ScanResultModel) {
 
         val state = scanResultModel.state
-        val scanResult = scanResultModel.scanResult
+        val device = scanResultModel.device
 
         scanResults.value?.let { r ->
-            val updateDevice = r.find { it.scanResult.device.address == scanResult.device.address }
+            val updateDevice = r.find { it.device.address == device.address }
 
             if (updateDevice != null) {
-                setChangedState(scanResult.device, state)
+                setChangedState(device, state)
             }
         }
     }
@@ -70,14 +70,14 @@ class BluetoothConnectionViewModel : ViewModel() {
     ) {
         scanResults.value?.let { currentList ->
             val updatedList = currentList.map {
-                if (it.scanResult.device.address == selDevice.address) {
+                if (it.device.address == selDevice.address) {
                     it.copy(state = state)
                 } else {
                     it
                 }
             }
 
-            if (updatedList.any { it.scanResult.device.address == selDevice.address }) {
+            if (updatedList.any { it.device.address == selDevice.address }) {
                 adapter.submitList(updatedList) {
                     this.scanResults.value = updatedList.toMutableList()
                 }
@@ -148,7 +148,7 @@ class BluetoothConnectionViewModel : ViewModel() {
 
         // 스캔 리스트에서 선택된 디바이스 제거
         val updatedScannedList = scannedList.filterNot {
-            it.scanResult.device.address == selDevice.address
+            it.device.address == selDevice.address
         }.toMutableList()
 
         // 본딩 후, 본딩 리스트에 추가하거나 상태 업데이트
@@ -189,30 +189,30 @@ class BluetoothConnectionViewModel : ViewModel() {
 
 
     @SuppressLint("MissingPermission")
-    private fun addDevice(scanResult: ScanResult) {
+    private fun addDevice(device: BluetoothDevice) {
         scanResults.value?.let { r ->
             // 이미 본딩된 장치는 추가 하지 않음
             val bondedAddressList =
                 HCBle.getBondedDevices().map { bondedDevice -> bondedDevice.address }
 
-            if (bondedAddressList.contains(scanResult.device.address)) {
+            if (bondedAddressList.contains(device.address)) {
                 return
             }
 
             // 이미 추가된 장치의 주소 목록을 가져와서 중복 검사
-            val existingAddresses = r.map { it.scanResult.device.address }
-            val bondState = scanResult.device.bondState
-            val connectState = if (HCBle.isConnect(scanResult.device))
+            val existingAddresses = r.map { it.device.address }
+            val bondState = device.bondState
+            val connectState = if (HCBle.isConnect(device))
                 BLEState.STATE_CONNECTED
             else
                 BLEState.STATE_DISCONNECTED
 
-            if (!existingAddresses.contains(scanResult.device.address)) {
+            if (!existingAddresses.contains(device.address)) {
                 val model =
                     ScanResultModel(
                         state = connectState,
                         bondState = bondState,
-                        scanResult = scanResult
+                        device = device
                     )
                 r.add(model)
                 scanResults.value = r // 변경된 리스트를 다시 할당
@@ -237,7 +237,7 @@ class BluetoothConnectionViewModel : ViewModel() {
                 BleSdkManager.startBleScan(
                     onScanResult = { scanResult ->
                         if (!scanResult.device.name.isNullOrBlank()) {
-                            addDevice(scanResult)
+                            addDevice(scanResult.device)
                         }
                     },
                     onScanStop = {
@@ -353,6 +353,7 @@ class BluetoothConnectionViewModel : ViewModel() {
         )
     }
 
+    @SuppressLint("MissingPermission")
     fun setInitConnectedItems() {
         if (MyPermission.isGrantedPermissions(
                 MyApplication.getAppContext(),
@@ -365,17 +366,28 @@ class BluetoothConnectionViewModel : ViewModel() {
                 HCBle.getBluetoothDeviceByAddress(address)
             }
 
-            connectedDeviceList.forEach { device ->
-                if (device != null) {
-//                    connect(device)
-                    HCBle.isConnect(device).let {
-                        val state =
-                            if (it) BLEState.STATE_CONNECTED else BLEState.STATE_DISCONNECTED
-                        Logger.d("Connected device: ${device.name} $state")
-                        setChangedState(device, state)
-                    }
-                }
-            }
+//            connectedDeviceList.filterNotNull().forEach { device ->
+//                if (HCBle.isConnect(device)) {
+//
+//                    if (device.bondState != BLEState.BOND_BONDED) {
+//                        val state = BLEState.STATE_CONNECTED
+//                        Logger.e("Connected device: ${device.name} $state")
+//
+//                        val scanResultModel = ScanResultModel(state, device.bondState, device)
+//
+//                        // scanResults 업데이트
+//                        scanResults.value = (scanResults.value ?: mutableListOf()).apply {
+//                            add(scanResultModel)
+//                        }
+//
+//                        // Adapter 리스트 업데이트 및 상태 갱신
+//                        adapter.submitList(scanResults.value?.toMutableList()) {
+//                            updateScanningResultsState(scanResultModel)
+//                        }
+//                    }
+//                }
+//            }
+
         }
     }
 

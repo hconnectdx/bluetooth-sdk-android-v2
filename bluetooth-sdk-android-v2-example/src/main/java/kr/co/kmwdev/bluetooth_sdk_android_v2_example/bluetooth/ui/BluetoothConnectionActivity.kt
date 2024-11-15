@@ -73,24 +73,24 @@ class BluetoothConnectionActivity : AppCompatActivity() {
         val recyclerView: RecyclerView = binding.recyclerView
         viewModel.apply {
             adapter =
-                BluetoothScanListAdapter { scanResult ->
-                    Logger.d("click: $scanResult")
+                BluetoothScanListAdapter { device ->
+                    Logger.d("click: $device")
 
-                    when (HCBle.isConnected(scanResult.device)) {
+                    when (HCBle.isConnected(device)) {
                         true -> {
                             updateScanningResultsState(
                                 ScanResultModel(
                                     BLEState.STATE_DISCONNECTING,
-                                    scanResult.device.bondState,
-                                    scanResult
+                                    device.bondState,
+                                    device
                                 )
                             )
-                            HCBle.disconnect(scanResult.device.address) {
+                            HCBle.disconnect(device.address) {
                                 updateScanningResultsState(
                                     ScanResultModel(
                                         BLEState.STATE_DISCONNECTED,
-                                        scanResult.device.bondState,
-                                        scanResult
+                                        device.bondState,
+                                        device
                                     )
                                 )
                             }
@@ -102,11 +102,11 @@ class BluetoothConnectionActivity : AppCompatActivity() {
                                 updateScanningResultsState(
                                     ScanResultModel(
                                         BLEState.STATE_CONNECTING,
-                                        scanResult.device.bondState,
-                                        scanResult
+                                        device.bondState,
+                                        device
                                     )
                                 )
-                                connect(scanResult.device)
+                                connect(device)
                             }
                         }
                     }
@@ -122,13 +122,16 @@ class BluetoothConnectionActivity : AppCompatActivity() {
                 (recyclerView.layoutManager as LinearLayoutManager).orientation
             )
             recyclerView.addItemDecoration(customDivider)
-            
+
             scanResults.observe(this@BluetoothConnectionActivity) { scanResultModels ->
                 Logger.d("Scan result updated $scanResultModels")
                 adapter.submitList(
                     scanResultModels.toMutableList()
-                        .filter { !it.scanResult.device.name.isNullOrBlank() })
+                        .filter { !it.device.name.isNullOrBlank() })
             }
+
+
+            setInitConnectedItems()
         }
     }
 
@@ -145,5 +148,7 @@ class BluetoothConnectionActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         viewModel.scanStop()
+        viewModel.bondedDevices.value?.clear()
+        viewModel.scanResults.value?.clear()
     }
 }
