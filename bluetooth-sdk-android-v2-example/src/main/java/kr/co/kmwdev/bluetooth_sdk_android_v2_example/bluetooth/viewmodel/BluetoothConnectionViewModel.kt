@@ -178,11 +178,11 @@ class BluetoothConnectionViewModel : ViewModel() {
 
         // LiveData 및 Adapter 업데이트
         bondedAdapter.submitList(updatedBondedList) {
-            this.bondedDevices.value = updatedBondedList
+            this.bondedDevices.postValue(updatedBondedList)
         }
 
         adapter.submitList(updatedScannedList) {
-            this.scanResults.value = updatedScannedList
+            this.scanResults.postValue(updatedScannedList)
         }
 
     }
@@ -230,26 +230,26 @@ class BluetoothConnectionViewModel : ViewModel() {
 
             // 기존 리스트를 clear하고 CONNECTED 상태의 디바이스만 유지
             scanResults.value = connectedDevices
-            adapter.submitList(connectedDevices) {
-                updateScanningStatus(true)
+            adapter.submitList(connectedDevices)
+            updateScanningStatus(true)
 
-                // BLE 스캔 시작
-                BleSdkManager.startBleScan(
-                    onScanResult = { scanResult ->
-                        if (!scanResult.device.name.isNullOrBlank()) {
-                            addDevice(scanResult.device)
-                        }
-                    },
-                    onScanStop = {
-                        Logger.d("Scan stopped")
-                        updateScanningStatus(false)
-                    },
-                    initBondedList = {
-                        setInitBondedItems()
-                        setInitConnectedItems()
+            // BLE 스캔 시작
+            BleSdkManager.startBleScan(
+                onScanResult = { scanResult ->
+                    if (!scanResult.device.name.isNullOrBlank()) {
+                        addDevice(scanResult.device)
                     }
-                )
-            }
+                },
+                onScanStop = {
+                    Logger.d("Scan stopped")
+                    updateScanningStatus(false)
+                },
+                initBondedList = {
+                    setInitBondedItems()
+                    setInitConnectedItems()
+                }
+            )
+
         }
     }
 
@@ -366,27 +366,28 @@ class BluetoothConnectionViewModel : ViewModel() {
                 HCBle.getBluetoothDeviceByAddress(address)
             }
 
-//            connectedDeviceList.filterNotNull().forEach { device ->
-//                if (HCBle.isConnect(device)) {
-//
-//                    if (device.bondState != BLEState.BOND_BONDED) {
-//                        val state = BLEState.STATE_CONNECTED
-//                        Logger.e("Connected device: ${device.name} $state")
-//
-//                        val scanResultModel = ScanResultModel(state, device.bondState, device)
-//
-//                        // scanResults 업데이트
-//                        scanResults.value = (scanResults.value ?: mutableListOf()).apply {
-//                            add(scanResultModel)
-//                        }
-//
-//                        // Adapter 리스트 업데이트 및 상태 갱신
-//                        adapter.submitList(scanResults.value?.toMutableList()) {
-//                            updateScanningResultsState(scanResultModel)
-//                        }
-//                    }
-//                }
-//            }
+            connectedDeviceList.filterNotNull().forEach { device ->
+                if (HCBle.isConnect(device)) {
+
+                    if (device.bondState != BLEState.BOND_BONDED) {
+                        val state = BLEState.STATE_CONNECTED
+                        Logger.e("Connected device: ${device.name} $state")
+
+                        val scanResultModel = ScanResultModel(state, device.bondState, device)
+
+                        // scanResults 업데이트
+                        scanResults.value = (scanResults.value ?: mutableListOf()).apply {
+                            add(scanResultModel)
+                        }
+
+                        // Adapter 리스트 업데이트 및 상태 갱신
+                        adapter.submitList(scanResults.value?.toMutableList()) {
+                            updateScanningResultsState(scanResultModel)
+                            connect(device)
+                        }
+                    }
+                }
+            }
 
         }
     }
@@ -402,6 +403,7 @@ class BluetoothConnectionViewModel : ViewModel() {
             val bondedList = HCBle.getBondedDevices().toMutableList()
             if (bondedList.isEmpty()) return true
             val filteredBondedList = bondedList.map { device ->
+                connect(device)
                 BondModel(
                     state = HCBle.isConnect(device).let {
                         if (it) BLEState.STATE_CONNECTED else BLEState.STATE_DISCONNECTED
@@ -412,6 +414,7 @@ class BluetoothConnectionViewModel : ViewModel() {
             }
 
             bondedDevices.value = filteredBondedList.toMutableList()
+
         }
         return false
     }

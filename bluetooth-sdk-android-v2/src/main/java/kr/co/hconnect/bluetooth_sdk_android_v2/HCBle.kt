@@ -186,11 +186,11 @@ object HCBle {
         useBondingChangeState: Boolean = true
     ) {
 
-        if (!isConnect(device) && mapBLEGatt[device.address] != null && mapBLEGatt[device.address]?.bluetoothGatt != null) {
-            Logger.e("Already connected to ${device.name}")
-            mapBLEGatt[device.address]?.bluetoothGatt?.connect()
-            return
-        }
+//        if (!isConnect(device) && mapBLEGatt[device.address] != null && mapBLEGatt[device.address]?.bluetoothGatt != null) {
+//            Logger.e("Already connected to ${device.name}")
+//            mapBLEGatt[device.address]?.bluetoothGatt?.connect()
+//            return
+//        }
 //
 //        onBondState?.invoke(device.bondState)
         val bondStateReceiver = object : BroadcastReceiver() {
