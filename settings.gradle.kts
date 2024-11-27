@@ -1,11 +1,5 @@
-import java.io.FileInputStream
-import java.util.Properties
-
 include(":bluetooth-sdk-android-v2-example")
-
-
 include(":polihealth-sdk-android-v2-example")
-
 
 pluginManagement {
     repositories {
@@ -21,18 +15,12 @@ pluginManagement {
     }
 }
 
+/** 플러그인 패키지를 어디서 다운로드를 해야 하는지 **/
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
     repositories {
         google()
         mavenCentral()
-        maven {
-            url = uri("https://maven.pkg.github.com/hconnectdx/bluetooth-sdk-android-v2")
-            credentials {
-                username = "hconnectdx"
-
-            }
-        }
     }
 }
 

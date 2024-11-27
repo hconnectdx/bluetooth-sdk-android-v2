@@ -178,7 +178,7 @@ object HCBle {
         device: BluetoothDevice,
         onConnState: ((state: Int) -> Unit)? = null,
         onBondState: ((state: Int) -> Unit)? = null,
-        onGattServiceState: ((state: Int) -> Unit)? = null,
+        onGattServiceState: ((state: Int, List<BluetoothGattService>) -> Unit)? = null,
         onReadCharacteristic: ((status: Int) -> Unit)? = null,
         onWriteCharacteristic: ((status: Int) -> Unit)? = null,
         onSubscriptionState: ((state: Boolean) -> Unit)? = null,
@@ -186,13 +186,6 @@ object HCBle {
         useBondingChangeState: Boolean = true
     ) {
 
-//        if (!isConnect(device) && mapBLEGatt[device.address] != null && mapBLEGatt[device.address]?.bluetoothGatt != null) {
-//            Logger.e("Already connected to ${device.name}")
-//            mapBLEGatt[device.address]?.bluetoothGatt?.connect()
-//            return
-//        }
-//
-//        onBondState?.invoke(device.bondState)
         val bondStateReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 val action = intent.action
@@ -257,13 +250,13 @@ object HCBle {
     private fun getGattConnection(
         device: BluetoothDevice,
         onConnState: ((state: Int) -> Unit)? = null,
-        onGattServiceState: ((state: Int) -> Unit)? = null,
+        onGattServiceState: ((state: Int, List<BluetoothGattService>) -> Unit)? = null,
         onReadCharacteristic: ((status: Int) -> Unit)? = null,
         onWriteCharacteristic: ((status: Int) -> Unit)? = null,
         onSubscriptionState: ((state: Boolean) -> Unit)? = null,
         onReceive: ((characteristic: BluetoothGattCharacteristic) -> Unit)? = null
     ): BluetoothGatt {
-        device.createBond()
+//        device.createBond()
         return device.connectGatt(appContext, true, object : BluetoothGattCallback() {
 
             /**
@@ -292,14 +285,13 @@ object HCBle {
                 if (status == GATTState.GATT_SUCCESS) {
                     gatt?.services?.let {
                         mapBLEGatt[address]?.setGattServiceList(gatt.services)
+                        onGattServiceState?.invoke(status, gatt.services)
                     } ?: run {
                         Logger.e("onServicesDiscovered: gatt.services is null")
                     }
                 } else {
                     Logger.e("onServicesDiscovered received: ${GATTState.getStatusDescription(status)}")
                 }
-
-                onGattServiceState?.invoke(status)
             }
 
             override fun onCharacteristicWrite(
@@ -363,7 +355,7 @@ object HCBle {
                     gattController.disconnect()
                     mapBLEGatt.remove(address)
                 } catch (e: TimeoutCancellationException) {
-                    Logger.e("Disconnect error: ${e.message}")
+                    Logger.e("Disconnect errors: ${e.message}")
                 } finally {
                     callback?.invoke() // 연결 해제 후 콜백 호출
                 }

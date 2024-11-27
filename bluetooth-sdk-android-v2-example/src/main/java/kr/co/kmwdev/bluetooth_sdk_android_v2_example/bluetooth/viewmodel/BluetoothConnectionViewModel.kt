@@ -337,8 +337,23 @@ class BluetoothConnectionViewModel : ViewModel() {
 
                 }
             },
-            onGattServiceState = { gattState ->
+            onGattServiceState = { gattState, gattServiceList ->
                 Logger.d("onGattServiceState: ${BLEState.getStateString(gattState)}")
+                Logger.d(gattServiceList.toString())
+                gattServiceList.forEach {
+                    Logger.d("Service UUID: ${it.uuid}")
+                    if (it.uuid.toString() == "0000ffe0-0000-1000-8000-00805f9b34fb") {
+                        HCBle.setServiceUUID(selDevice.address, it.uuid.toString())
+
+                        it.characteristics.forEach { c ->
+                            if (c.uuid.toString() == "0000ffe1-0000-1000-8000-00805f9b34fb") {
+                                HCBle.setCharacteristicUUID(selDevice.address, c.uuid.toString())
+                                HCBle.setCharacteristicNotification(selDevice.address, true)
+                            }
+                        }
+                    }
+                }
+//                HCBle.setServiceUUID()
             },
             onSubscriptionState = {
                 Logger.e("onSubscriptionState: $it")

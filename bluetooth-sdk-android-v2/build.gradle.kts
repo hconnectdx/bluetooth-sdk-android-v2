@@ -38,11 +38,10 @@ android {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    implementation(libs.kotlinx.coroutines.core)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
-    implementation(libs.kotlinx.coroutines.core)
-    implementation("androidx.work:work-runtime:2.7.1")
-
 }
 
 val projectProps = Properties()
@@ -58,6 +57,7 @@ val githubUrl: String = projectProps.getProperty("github_url")
 val githubUsername: String = projectProps.getProperty("github_user_name")
 val githubAccessToken: String = projectProps.getProperty("github_access_token")
 
+/** 빌드 구성 단계가 완료된 뒤 실행되는 블록 **/
 afterEvaluate {
     publishing {
         publications {
