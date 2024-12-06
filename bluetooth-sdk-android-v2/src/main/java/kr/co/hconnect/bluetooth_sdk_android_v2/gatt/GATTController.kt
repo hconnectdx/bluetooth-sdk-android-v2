@@ -14,18 +14,19 @@ import java.util.UUID
 class GATTController(val bluetoothGatt: BluetoothGatt) {
 
     private lateinit var gattServiceList: List<BluetoothGattService>
-    lateinit var selService: BluetoothGattService
-    lateinit var selCharacteristic: BluetoothGattCharacteristic
+    private lateinit var selService: BluetoothGattService
+    private lateinit var selCharacteristic: BluetoothGattCharacteristic
 
     fun disconnect() {
         bluetoothGatt.disconnect()
         bluetoothGatt.close()
     }
 
-    fun getGattServiceList(): List<BluetoothGattService> {
+    fun getGattServiceList(): List<BluetoothGattService>? {
         try {
             if (::gattServiceList.isInitialized.not()) {
-                throw Exception("getGattServiceList: gattServiceList is not initialized")
+                Logger.e("getGattServiceList(): gattServiceList is not initialized")
+                return null
             }
             return gattServiceList
         } catch (e: Exception) {
@@ -35,18 +36,25 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
     }
 
     fun setGattServiceList(gattServiceList: List<BluetoothGattService>) {
+        if (::gattServiceList.isInitialized.not()) {
+            Logger.e("getGattServiceList(): gattServiceList is not initialized")
+            return
+        }
         this.gattServiceList = gattServiceList
+
     }
 
     fun setServiceUUID(uuid: String) {
         try {
             if (::gattServiceList.isInitialized.not()) {
-                throw Exception("setServiceUUID: gattServiceList is not initialized")
+                Logger.e("setServiceUUID: gattServiceList is not initialized")
+                return
             }
             gattServiceList.find { it.uuid.toString() == uuid }?.let {
                 selService = it
                 Logger.d("setServiceUUID: $uuid")
             }
+
         } catch (e: Exception) {
             Logger.e("setServiceUUID: ${e.message}")
         }
@@ -56,19 +64,26 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
     fun setCharacteristicUUID(characteristicUUID: String) {
         try {
             if (::selService.isInitialized.not()) {
-                throw Exception("Service is not initialized")
+                Logger.e("setCharacteristicUUID: Service is not initialized")
+                return
             }
             selService.characteristics.find { it.uuid.toString() == characteristicUUID }?.let {
                 selCharacteristic = it
                 Logger.d("setCharacteristicUUID: $characteristicUUID")
             }
+
         } catch (e: Exception) {
             Logger.e("setCharacteristicUUID: ${e.message}")
         }
     }
 
     fun readCharacteristic() {
+        if (::selCharacteristic.isInitialized.not()) {
+            Logger.e("selCharacteristic is not initialized")
+            return
+        }
         bluetoothGatt.readCharacteristic(selCharacteristic)
+
     }
 
     fun writeCharacteristic(data: ByteArray) {
@@ -85,6 +100,14 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
     }
 
     fun setCharacteristicNotification(isEnable: Boolean, isIndicate: Boolean = false) {
+        if (::gattServiceList.isInitialized.not()) {
+            Logger.e("gattServiceList list is empty")
+            return
+        }
+        if (::selService.isInitialized.not()) {
+            Logger.e("selService is not initialized")
+            return
+        }
         // 알림 또는 인디케이션 설정
         bluetoothGatt.setCharacteristicNotification(selCharacteristic, isEnable)
 
@@ -112,6 +135,10 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
 
 
     fun readCharacteristicNotification() {
+        if (::selCharacteristic.isInitialized.not()) {
+            Logger.e("selCharacteristic is not initialized")
+            return
+        }
         val descriptor =
             selCharacteristic.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"))
         bluetoothGatt.readDescriptor(descriptor)

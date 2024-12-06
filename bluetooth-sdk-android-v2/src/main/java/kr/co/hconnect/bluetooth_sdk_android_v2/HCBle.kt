@@ -256,7 +256,7 @@ object HCBle {
         onSubscriptionState: ((state: Boolean) -> Unit)? = null,
         onReceive: ((characteristic: BluetoothGattCharacteristic) -> Unit)? = null
     ): BluetoothGatt {
-//        device.createBond()
+        device.createBond()
         return device.connectGatt(appContext, true, object : BluetoothGattCallback() {
 
             /**
