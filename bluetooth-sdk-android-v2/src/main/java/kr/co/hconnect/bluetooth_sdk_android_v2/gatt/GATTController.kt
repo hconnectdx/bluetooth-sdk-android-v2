@@ -14,8 +14,8 @@ import java.util.UUID
 class GATTController(val bluetoothGatt: BluetoothGatt) {
 
     private lateinit var gattServiceList: List<BluetoothGattService>
-    private lateinit var selService: BluetoothGattService
-    private lateinit var selCharacteristic: BluetoothGattCharacteristic
+    lateinit var selService: BluetoothGattService
+    lateinit var selCharacteristic: BluetoothGattCharacteristic
 
     fun disconnect() {
         bluetoothGatt.disconnect()

@@ -371,7 +371,7 @@ object HCBle {
      * 블루투스가 연결되어 onServicesDiscovered 콜백이 호출 돼야 사용가능합니다.
      * @return
      */
-    fun getGattServiceList(deviceAddress: String): List<BluetoothGattService> {
+    fun getGattServiceList(deviceAddress: String): List<BluetoothGattService>? {
         val gattController: GATTController = mapBLEGatt[deviceAddress] ?: return emptyList()
         return gattController.getGattServiceList()
     }
