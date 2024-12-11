@@ -290,6 +290,7 @@ object HCBle {
                         onGattServiceState?.invoke(status, gatt.services)
                         if (device.bondState == BluetoothDevice.BOND_NONE) {
                             Log.d("Bluetooth", "장치가 페어링되지 않음. createBond() 호출...")
+                            device.setPairingConfirmation(true)
                             device.createBond()
                         }
                     } ?: run {
