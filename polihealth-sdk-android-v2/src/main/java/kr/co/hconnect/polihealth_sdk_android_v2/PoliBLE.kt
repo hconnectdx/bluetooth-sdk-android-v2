@@ -32,9 +32,12 @@ object PoliBLE {
     }
 
     fun startScan(scanDevice: (ScanResult) -> Unit) {
-        HCBle.scanLeDevice { device ->
-            scanDevice.invoke(device)
-        }
+        HCBle.scanLeDevice(
+            onScanResult = { device ->
+                scanDevice.invoke(device)
+            }, onScanStop = {
+                Log.d(TAG, "Scan Stop")
+            })
     }
 
     fun stopScan() {
@@ -50,7 +53,7 @@ object PoliBLE {
         context: Context? = null,
         device: BluetoothDevice,
         onConnState: (state: Int) -> Unit,
-        onGattServiceState: (gatt: Int) -> Unit,
+        onGattServiceState: (gatt: Int, services: List<BluetoothGattService>) -> Unit,
         onBondState: (bondState: Int) -> Unit,
         onSubscriptionState: (state: Boolean) -> Unit,
         onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
@@ -60,11 +63,14 @@ object PoliBLE {
             onConnState = { state ->
                 onConnState.invoke(state)
             },
-            onGattServiceState = { gatt ->
-                onGattServiceState.invoke(gatt)
+            onGattServiceState = { gatt, services ->
+                onGattServiceState.invoke(gatt, services)
             },
             onBondState = { bondState ->
                 onBondState.invoke(bondState)
+            },
+            onWriteCharacteristic = {
+                Log.d(TAG, "Write Characteristic")
             },
             onSubscriptionState = { state ->
                 onSubscriptionState.invoke(state)
@@ -268,8 +274,8 @@ object PoliBLE {
         return ByteArray(0)
     }
 
-    fun disconnectDevice() {
-        HCBle.disconnect()
+    fun disconnectDevice(deviceAddress: String) {
+        HCBle.disconnect(deviceAddress)
     }
 
     /**
@@ -277,8 +283,8 @@ object PoliBLE {
      * 블루투스가 연결되어 onServicesDiscovered 콜백이 호출 돼야 사용가능합니다.
      * @return
      */
-    fun getGattServiceList(): List<BluetoothGattService> {
-        return HCBle.getGattServiceList()
+    fun getGattServiceList(deviceAddress: String): List<BluetoothGattService>? {
+        return HCBle.getGattServiceList(deviceAddress)
     }
 
     /**
@@ -286,8 +292,8 @@ object PoliBLE {
      * 사용 하고자 하는 서비스 UUID를 설정합니다.
      * @param uuid
      */
-    fun setServiceUUID(uuid: String) {
-        HCBle.setServiceUUID(uuid)
+    fun setServiceUUID(deviceAddress: String, uuid: String) {
+        HCBle.setServiceUUID(deviceAddress, uuid)
     }
 
     /**
@@ -295,16 +301,16 @@ object PoliBLE {
      * 사용 하고자 하는 캐릭터리스틱 UUID를 설정합니다.
      * @param characteristicUUID
      */
-    fun setCharacteristicUUID(characteristicUUID: String) {
-        HCBle.setCharacteristicUUID(characteristicUUID)
+    fun setCharacteristicUUID(deviceAddress: String, characteristicUUID: String) {
+        HCBle.setCharacteristicUUID(deviceAddress, characteristicUUID)
     }
 
     /**
      * TODO: 캐릭터리스틱을 읽습니다.
      * setCharacteristicUUID로 설정된 캐릭터리스틱을 읽습니다.
      */
-    fun readCharacteristic() {
-        HCBle.readCharacteristic()
+    fun readCharacteristic(deviceAddress: String) {
+        HCBle.readCharacteristic(deviceAddress)
     }
 
     /**
@@ -312,8 +318,8 @@ object PoliBLE {
      * setCharacteristicUUID로 설정된 캐릭터리스틱에 데이터를 쓰기합니다.
      * @param data
      */
-    fun writeCharacteristic(data: ByteArray) {
-        HCBle.writeCharacteristic(data)
+    fun writeCharacteristic(deviceAddress: String, data: ByteArray) {
+        HCBle.writeCharacteristic(deviceAddress, data)
     }
 
     /**
@@ -321,8 +327,12 @@ object PoliBLE {
      * setCharacteristicUUID로 설정된 캐릭터리스틱에 알림을 설정합니다.
      * @param isEnable
      */
-    fun setCharacteristicNotification(isEnable: Boolean, isIndicate: Boolean = false) {
-        HCBle.setCharacteristicNotification(isEnable, isIndicate)
+    fun setCharacteristicNotification(
+        deviceAddress: String,
+        isEnable: Boolean,
+        isIndicate: Boolean = false
+    ) {
+        HCBle.setCharacteristicNotification(deviceAddress, isEnable, isIndicate)
     }
 
     fun getBondedDevices(): List<BluetoothDevice> {

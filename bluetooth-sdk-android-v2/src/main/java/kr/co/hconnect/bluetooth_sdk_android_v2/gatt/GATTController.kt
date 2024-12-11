@@ -36,7 +36,7 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
     }
 
     fun setGattServiceList(gattServiceList: List<BluetoothGattService>) {
-        if (::gattServiceList.isInitialized.not()) {
+        if (gattServiceList.isEmpty()) {
             Logger.e("getGattServiceList(): gattServiceList is not initialized")
             return
         }
@@ -88,6 +88,7 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
 
     fun writeCharacteristic(data: ByteArray) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // API 33 이상
+
             bluetoothGatt.writeCharacteristic(
                 selCharacteristic,
                 data,

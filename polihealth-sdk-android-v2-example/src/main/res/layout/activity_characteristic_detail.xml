@@ -21,6 +21,24 @@
         android:text="Notify" />
 
     <Button
+        android:id="@+id/btn_indicate"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Indicate" />
+
+    <Button
+        android:id="@+id/btn_write"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Write" />
+
+    <Button
+        android:id="@+id/btn_read"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Read" />
+
+    <Button
         android:id="@+id/btn_write_call"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

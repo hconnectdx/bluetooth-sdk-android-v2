@@ -300,6 +300,7 @@ object HCBle {
                 status: Int
             ) {
                 super.onCharacteristicWrite(gatt, characteristic, status)
+                Log.d(TAG_GATT_SERVICE, "onCharacteristicWrite: ${characteristic?.value}")
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     Log.d(TAG_GATT_SERVICE, "onCharacteristicWrite: ${getGattStateString(status)}")
                 }
@@ -470,10 +471,8 @@ object HCBle {
 
     fun getGattStateString(state: Int): String {
         return when (state) {
-            BLEState.STATE_DISCONNECTED -> "STATE_DISCONNECTED"
-            BLEState.STATE_CONNECTING -> "STATE_CONNECTING"
-            BLEState.STATE_CONNECTED -> "STATE_CONNECTED"
-            BLEState.STATE_DISCONNECTING -> "STATE_DISCONNECTING"
+            BLEState.GATT_FAILURE -> "GATT_FAILURE"
+            BLEState.GATT_SUCCESS -> "GATT_SUCCESS"
             else -> "UNKNOWN_STATE"
         }
     }

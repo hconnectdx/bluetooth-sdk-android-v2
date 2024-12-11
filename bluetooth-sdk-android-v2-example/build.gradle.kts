@@ -27,7 +27,7 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
+//        sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
     kotlinOptions {
@@ -40,16 +40,17 @@ android {
 
 dependencies {
 
-    implementation(libs.androidx.core.ktx)
-    implementation(platform(libs.kotlin.bom))
-    implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.activity)
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
+    implementation(platform(libs.kotlin.bom))
+    implementation(libs.kotlinx.coroutines.core)
     implementation(libs.androidx.constraintlayout)
+    implementation(libs.kotlinx.coroutines.android)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.coroutines.android)
     implementation(project(":bluetooth-sdk-android-v2"))
 }

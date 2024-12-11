@@ -1,5 +1,6 @@
 package kr.co.hconnect.polihealth_sdk_android_v2_example
 
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.content.Context
@@ -19,7 +20,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kr.co.hconnect.bluetooth_sdk_android_v2.service.BleService
 import kr.co.hconnect.polihealth_sdk_android_v2.PoliBLE
 import kr.co.hconnect.polihealth_sdk_android.PoliClient
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.DailyProtocol01API
@@ -30,6 +30,7 @@ import kr.co.hconnect.polihealth_sdk_android_v2_example.device_detail.DeviceDeta
 import kr.co.hconnect.polihealth_sdk_android_v2_example.permission.PermissionManager
 import kr.co.hconnect.polihealth_sdk_android_v2_example.permission.Permissions
 
+@SuppressLint("MissingPermission")
 class MainActivity : AppCompatActivity() {
 
     private lateinit var deviceListAdapter: DeviceListAdapter
@@ -38,7 +39,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        setBtnProtocolTest()
+//        setBtnProtocolTest()
         setDeviceList()
         setBtnScan()
     }
@@ -236,35 +237,20 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        val btnTestService: Button = findViewById(R.id.btn_service)
-        btnTestService.setOnClickListener {
-            val intent = Intent(this, BleService::class.java).apply {
-
-            }
-            startService(intent)
-        }
+//        val btnTestService: Button = findViewById(R.id.btn_service)
+//        btnTestService.setOnClickListener {
+//            val intent = Intent(this, BleService::class.java).apply {
+//
+//            }
+//            startService(intent)
+//        }
 
         val btnStopScan: Button = findViewById(R.id.btn_stop_scan)
         btnStopScan.setOnClickListener {
             stopScan()
         }
 
-        val btnSend0x03: Button = findViewById(R.id.btn_send_0x03)
-        btnSend0x03.setOnClickListener {
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    PoliBLE.writeCharacteristic("0xE1".toByteArray())
-                    delay(100)
-                    PoliBLE.writeCharacteristic("0xA6".toByteArray())
-                    delay(100)
-                    PoliBLE.writeCharacteristic("0x01".toByteArray())
-                    delay(100)
-                    PoliBLE.writeCharacteristic("0x03".toByteArray())
-                } catch (e: Exception) {
-                    Log.e("MainActivity", "error: $e")
-                }
-            }
-        }
+        
     }
 
     override fun onStart() {

@@ -1,5 +1,6 @@
 package kr.co.hconnect.polihealth_sdk_android_v2_example.device_detail
 
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
@@ -29,6 +30,7 @@ import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.SleepResponse
 import kr.co.hconnect.polihealth_sdk_android_v2_example.characteristic_detail.CharacteristicDetailActivity
 import kr.co.hconnect.polihealth_sdk_android_v2_example.R
 
+@SuppressLint("MissingPermission")
 class DeviceDetailActivity : AppCompatActivity() {
 
     private lateinit var expandableListView: ExpandableListView
@@ -55,7 +57,9 @@ class DeviceDetailActivity : AppCompatActivity() {
             tvDeviceName.text = "Device: ${it.name ?: "Unknown"}"
         }
 
-        setExpandableList()
+        if (device != null) {
+            setExpandableList(device.address)
+        }
 
         btnConnect.setOnClickListener {
             device?.let {
@@ -64,23 +68,26 @@ class DeviceDetailActivity : AppCompatActivity() {
         }
 
         btnDisconnect.setOnClickListener {
-            PoliBLE.disconnectDevice()
+            if (device != null) {
+                PoliBLE.disconnectDevice(device.address)
+            }
             tvStatus.text = "Status: Disconnected"
         }
     }
 
-    private fun setExpandableList() {
+    private fun setExpandableList(deviceAddress: String) {
         expandableListAdapter = CustomExpandableListAdapter(this, serviceList, characteristicMap)
         expandableListView.setAdapter(expandableListAdapter)
 
         expandableListView.setOnChildClickListener { _, _, groupPosition, childPosition, _ ->
             val service = serviceList[groupPosition]
-            PoliBLE.setServiceUUID(service.uuid.toString())
+            PoliBLE.setServiceUUID(deviceAddress, service.uuid.toString())
             val characteristic = characteristicMap[service.uuid.toString()]?.get(childPosition)
-            PoliBLE.setCharacteristicUUID(characteristic?.uuid.toString())
+            PoliBLE.setCharacteristicUUID(deviceAddress, characteristic?.uuid.toString())
             characteristic?.let {
                 val intent = Intent(this, CharacteristicDetailActivity::class.java).apply {
                     putExtra("CHARACTERISTIC_UUID", it.uuid.toString())
+                    putExtra("DEVICE_ADDRESS", deviceAddress)
                 }
                 startActivity(intent)
             }
@@ -141,14 +148,14 @@ class DeviceDetailActivity : AppCompatActivity() {
                     }
                 }
             },
-            onGattServiceState = { gatt ->
+            onGattServiceState = { gatt, services ->
                 CoroutineScope(Dispatchers.Main).launch {
                     when (gatt) {
                         BluetoothGatt.GATT_SUCCESS -> {
                             tvStatus.text = "Status: GATT Success"
                             serviceList.clear()
                             // 장치의 모든 서비스를 추가
-                            serviceList.addAll(PoliBLE.getGattServiceList())
+                            serviceList.addAll(services)
                             // 각 서비스의 특성을 매핑
                             for (service in serviceList) {
                                 characteristicMap[service.uuid.toString()] = service.characteristics
