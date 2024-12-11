@@ -256,7 +256,6 @@ object HCBle {
         onSubscriptionState: ((state: Boolean) -> Unit)? = null,
         onReceive: ((characteristic: BluetoothGattCharacteristic) -> Unit)? = null
     ): BluetoothGatt {
-        device.createBond()
         return device.connectGatt(appContext, true, object : BluetoothGattCallback() {
 
             /**
@@ -268,7 +267,10 @@ object HCBle {
                 val address = gatt?.device?.address ?: ""
 
                 when (newState) {
-                    BLEState.STATE_CONNECTED -> mapBLEGatt[address]?.bluetoothGatt?.discoverServices()
+                    BLEState.STATE_CONNECTED -> {
+                        mapBLEGatt[address]?.bluetoothGatt?.discoverServices()
+                    }
+
                     else -> disableNotification()
                 }
 
@@ -286,6 +288,10 @@ object HCBle {
                     gatt?.services?.let {
                         mapBLEGatt[address]?.setGattServiceList(gatt.services)
                         onGattServiceState?.invoke(status, gatt.services)
+                        if (device.bondState == BluetoothDevice.BOND_NONE) {
+                            Log.d("Bluetooth", "장치가 페어링되지 않음. createBond() 호출...")
+                            device.createBond()
+                        }
                     } ?: run {
                         Logger.e("onServicesDiscovered: gatt.services is null")
                     }
