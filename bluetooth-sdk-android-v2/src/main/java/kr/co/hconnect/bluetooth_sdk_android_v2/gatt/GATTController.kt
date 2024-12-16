@@ -57,10 +57,26 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
                 Logger.e("setTargetServiceUUID: gattServiceList is not initialized")
                 return
             }
-            gattServiceList.find { it.uuid.toString() == uuid }?.let {
-                targetService = it
-                Logger.d("setTargetServiceUUID: $uuid")
+
+            val findService = gattServiceList.find { it.uuid.toString() == uuid }
+
+
+            Logger.d("내가 선택한 서비스 uuid: ${uuid}")
+            gattServiceList.forEach { service ->
+                Logger.d("2Registered Service UUID: ${service.uuid}")
+                service.characteristics.forEach { characteristic ->
+                    Logger.d("2Registered Characteristic UUID: ${characteristic.uuid}")
+                }
             }
+
+
+            if (findService == null) {
+                Logger.e("setTargetServiceUUID: Service not found")
+                return
+            }
+
+            Logger.d("setTargetServiceUUID: Service found $findService")
+            targetService = findService
 
         } catch (e: Exception) {
             Logger.e("setTargetServiceUUID: ${e.message}")
