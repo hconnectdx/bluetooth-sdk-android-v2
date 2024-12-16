@@ -10,6 +10,7 @@ import android.util.Log
 import java.util.UUID
 
 @SuppressLint("MissingPermission")
+@Deprecated("Use GATTController instead")
 class GATTService(private val bluetoothGatt: BluetoothGatt) {
     private lateinit var gattServiceList: List<BluetoothGattService>
     private lateinit var _selService: BluetoothGattService

@@ -21,14 +21,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 import kr.co.hconnect.bluetooth_sdk_android.gatt.BLEState
-import kr.co.hconnect.bluetooth_sdk_android_v2.scan.BleScanHandler
 import kr.co.hconnect.bluetooth_sdk_android_v2.gatt.GATTController
 import kr.co.hconnect.bluetooth_sdk_android_v2.gatt.GATTState
+import kr.co.hconnect.bluetooth_sdk_android_v2.scan.BleScanHandler
 import kr.co.hconnect.bluetooth_sdk_android_v2.util.Logger
 import java.util.UUID
 
@@ -106,10 +105,6 @@ object HCBle {
                     bluetoothLeScanner.stopScan(scanHandler.leScanCallback)
                 }
             }
-        } else {
-            scanning = false
-            scanJob?.cancel()
-            bluetoothLeScanner.stopScan(scanHandler.leScanCallback)
         }
     }
 
@@ -121,6 +116,10 @@ object HCBle {
             scanning = false
             bluetoothLeScanner.stopScan(scanHandler.leScanCallback)
         }
+    }
+
+    fun isScanning(): Boolean {
+        return scanning
     }
 
     fun isConnect(device: BluetoothDevice): Boolean {
@@ -153,7 +152,7 @@ object HCBle {
             return null
         }
 
-        return gattController.selService
+        return gattController.targetService
     }
 
     fun getSelCharacteristic(deviceAddress: String): BluetoothGattCharacteristic? {
@@ -162,7 +161,7 @@ object HCBle {
             Logger.e("gattController is not initialized")
             return null
         }
-        return gattController.selCharacteristic
+        return gattController.targetCharacteristic
     }
 
     /**
@@ -256,6 +255,14 @@ object HCBle {
         onSubscriptionState: ((state: Boolean) -> Unit)? = null,
         onReceive: ((characteristic: BluetoothGattCharacteristic) -> Unit)? = null
     ): BluetoothGatt {
+        // GATT 연결 전에 페어링 상태 확인
+        if (device.bondState == BluetoothDevice.BOND_BONDED) {
+            Log.d("Bluetooth", "장치가 이미 페어링된 상태입니다.")
+        } else {
+            Log.d("Bluetooth", "장치가 페어링 되지 않았습니다. createBond() 호출.")
+            device.createBond() // 페어링 요청
+        }
+
         return device.connectGatt(appContext, true, object : BluetoothGattCallback() {
 
             /**
@@ -290,8 +297,7 @@ object HCBle {
                         onGattServiceState?.invoke(status, gatt.services)
                         if (device.bondState == BluetoothDevice.BOND_NONE) {
                             Log.d("Bluetooth", "장치가 페어링되지 않음. createBond() 호출...")
-                            device.setPairingConfirmation(true)
-                            device.createBond()
+//                            device.createBond()
                         }
                     } ?: run {
                         Logger.e("onServicesDiscovered: gatt.services is null")
@@ -394,7 +400,7 @@ object HCBle {
             Log.e(TAG, "gattController is not initialized")
             return
         }
-        gattController.setServiceUUID(uuid)
+        gattController.setTargetServiceUUID(uuid)
     }
 
     /**
@@ -407,7 +413,7 @@ object HCBle {
             Log.e(TAG, "gattController is not initialized")
             return
         }
-        gattController.setCharacteristicUUID(characteristicUUID)
+        gattController.setTargetCharacteristicUUID(characteristicUUID)
     }
 
     /**
