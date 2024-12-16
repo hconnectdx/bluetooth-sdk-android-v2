@@ -395,7 +395,7 @@ object HCBle {
      * 사용 하고자 하는 서비스 UUID를 설정합니다.
      * @param uuid
      */
-    fun setServiceUUID(deviceAddress: String, uuid: String) {
+    fun setTargetServiceUUID(deviceAddress: String, uuid: String) {
         val gattController: GATTController = mapBLEGatt[deviceAddress] ?: run {
             Log.e(TAG, "gattController is not initialized")
             return
@@ -408,7 +408,7 @@ object HCBle {
      * 사용 하고자 하는 캐릭터리스틱 UUID를 설정합니다.
      * @param characteristicUUID
      */
-    fun setCharacteristicUUID(deviceAddress: String, characteristicUUID: String) {
+    fun setTargetCharacteristicUUID(deviceAddress: String, characteristicUUID: String) {
         val gattController: GATTController = mapBLEGatt[deviceAddress] ?: run {
             Log.e(TAG, "gattController is not initialized")
             return

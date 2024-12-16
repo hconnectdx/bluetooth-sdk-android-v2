@@ -292,8 +292,8 @@ object PoliBLE {
      * 사용 하고자 하는 서비스 UUID를 설정합니다.
      * @param uuid
      */
-    fun setServiceUUID(deviceAddress: String, uuid: String) {
-        HCBle.setServiceUUID(deviceAddress, uuid)
+    fun setTargetServiceUUID(deviceAddress: String, uuid: String) {
+        HCBle.setTargetServiceUUID(deviceAddress, uuid)
     }
 
     /**
@@ -301,8 +301,8 @@ object PoliBLE {
      * 사용 하고자 하는 캐릭터리스틱 UUID를 설정합니다.
      * @param characteristicUUID
      */
-    fun setCharacteristicUUID(deviceAddress: String, characteristicUUID: String) {
-        HCBle.setCharacteristicUUID(deviceAddress, characteristicUUID)
+    fun setTargetCharacteristicUUID(deviceAddress: String, characteristicUUID: String) {
+        HCBle.setTargetCharacteristicUUID(deviceAddress, characteristicUUID)
     }
 
     /**

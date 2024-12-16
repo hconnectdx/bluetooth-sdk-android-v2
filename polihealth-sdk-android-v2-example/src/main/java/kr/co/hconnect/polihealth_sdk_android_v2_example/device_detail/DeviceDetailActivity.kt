@@ -81,9 +81,9 @@ class DeviceDetailActivity : AppCompatActivity() {
 
         expandableListView.setOnChildClickListener { _, _, groupPosition, childPosition, _ ->
             val service = serviceList[groupPosition]
-            PoliBLE.setServiceUUID(deviceAddress, service.uuid.toString())
+            PoliBLE.setTargetServiceUUID(deviceAddress, service.uuid.toString())
             val characteristic = characteristicMap[service.uuid.toString()]?.get(childPosition)
-            PoliBLE.setCharacteristicUUID(deviceAddress, characteristic?.uuid.toString())
+            PoliBLE.setTargetCharacteristicUUID(deviceAddress, characteristic?.uuid.toString())
             characteristic?.let {
                 val intent = Intent(this, CharacteristicDetailActivity::class.java).apply {
                     putExtra("CHARACTERISTIC_UUID", it.uuid.toString())
