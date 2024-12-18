@@ -84,7 +84,7 @@ object HCBle {
         scanHandler = BleScanHandler(onScanResult)
 
         if (!scanning) {
-            scanJob = CoroutineScope(Dispatchers.Main).launch {
+            scanJob = CoroutineScope(Dispatchers.IO).launch {
                 scanning = true
                 bluetoothLeScanner.startScan(scanHandler.leScanCallback)
 
@@ -115,6 +115,7 @@ object HCBle {
         if (scanning) {
             scanning = false
             bluetoothLeScanner.stopScan(scanHandler.leScanCallback)
+            Logger.d("scanStop: Stop scanning")
         }
     }
 
@@ -179,7 +180,7 @@ object HCBle {
         onBondState: ((state: Int) -> Unit)? = null,
         onGattServiceState: ((state: Int, List<BluetoothGattService>) -> Unit)? = null,
         onReadCharacteristic: ((status: Int) -> Unit)? = null,
-        onWriteCharacteristic: ((status: Int) -> Unit)? = null,
+        onWriteCharacteristic: ((status: Int, characteristic: BluetoothGattCharacteristic?) -> Unit)? = null,
         onSubscriptionState: ((state: Boolean) -> Unit)? = null,
         onReceive: ((characteristic: BluetoothGattCharacteristic) -> Unit)? = null,
         useBondingChangeState: Boolean = true
@@ -204,6 +205,11 @@ object HCBle {
             )
         }
 
+        if (mapBLEGatt.containsKey(device.address)) {
+            Logger.e("Already connected to the device. device: ${device.name}")
+            Logger.e("디바이스를 지우고 재연결 합니다.")
+            mapBLEGatt.remove(device.address)
+        }
 
         mapBLEGatt[device.address] = GATTController(
             getGattConnection(
@@ -251,19 +257,20 @@ object HCBle {
         onConnState: ((state: Int) -> Unit)? = null,
         onGattServiceState: ((state: Int, List<BluetoothGattService>) -> Unit)? = null,
         onReadCharacteristic: ((status: Int) -> Unit)? = null,
-        onWriteCharacteristic: ((status: Int) -> Unit)? = null,
+        onWriteCharacteristic: ((status: Int, characteristic: BluetoothGattCharacteristic?) -> Unit)? = null,
         onSubscriptionState: ((state: Boolean) -> Unit)? = null,
-        onReceive: ((characteristic: BluetoothGattCharacteristic) -> Unit)? = null
+        onReceive: ((characteristic: BluetoothGattCharacteristic) -> Unit)? = null,
+        autoConnect: Boolean = false
     ): BluetoothGatt {
         // GATT 연결 전에 페어링 상태 확인
-        if (device.bondState == BluetoothDevice.BOND_BONDED) {
-            Log.d("Bluetooth", "장치가 이미 페어링된 상태입니다.")
-        } else {
-            Log.d("Bluetooth", "장치가 페어링 되지 않았습니다. createBond() 호출.")
-            device.createBond() // 페어링 요청
-        }
+//        if (device.bondState == BluetoothDevice.BOND_BONDED) {
+//            Log.d("Bluetooth", "장치가 이미 페어링된 상태입니다.")
+//        } else {
+//            Log.d("Bluetooth", "장치가 페어링 되지 않았습니다. createBond() 호출.")
+//            device.createBond() // 페어링 요청
+//        }
 
-        return device.connectGatt(appContext, true, object : BluetoothGattCallback() {
+        return device.connectGatt(appContext, autoConnect, object : BluetoothGattCallback() {
 
             /**
              * TODO: 디바이스와 연결 상태가 변경될 때 호출됩니다.
@@ -278,7 +285,10 @@ object HCBle {
                         mapBLEGatt[address]?.bluetoothGatt?.discoverServices()
                     }
 
-                    else -> disableNotification()
+                    else -> {
+                        disableNotification()
+                        gatt?.close()
+                    }
                 }
 
                 onConnState?.invoke(newState)
@@ -297,7 +307,6 @@ object HCBle {
                         onGattServiceState?.invoke(status, gatt.services)
                         if (device.bondState == BluetoothDevice.BOND_NONE) {
                             Log.d("Bluetooth", "장치가 페어링되지 않음. createBond() 호출...")
-//                            device.createBond()
                         }
                     } ?: run {
                         Logger.e("onServicesDiscovered: gatt.services is null")
@@ -317,7 +326,7 @@ object HCBle {
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     Log.d(TAG_GATT_SERVICE, "onCharacteristicWrite: ${getGattStateString(status)}")
                 }
-                onWriteCharacteristic?.invoke(status)
+                onWriteCharacteristic?.invoke(status, characteristic)
             }
 
             @Deprecated("Deprecated in Java")
@@ -361,22 +370,18 @@ object HCBle {
      * @param callback
      */
     fun disconnect(address: String, callback: (() -> Unit)? = null) {
+        Logger.d("disconnect address: $address")
         val gattController: GATTController? = mapBLEGatt[address]
+        gattController?.disconnect()
+        mapBLEGatt.remove(address)
+        Logger.d("Disconnect success")
+    }
 
-        if (gattController != null) {
-            CoroutineScope(Dispatchers.Main).launch {
-                try {
-                    gattController.disconnect()
-                    mapBLEGatt.remove(address)
-                } catch (e: TimeoutCancellationException) {
-                    Logger.e("Disconnect errors: ${e.message}")
-                } finally {
-                    callback?.invoke() // 연결 해제 후 콜백 호출
-                }
-            }
-        } else {
-            callback?.invoke()
+    fun disconnectAll() {
+        mapBLEGatt.forEach { (address, gattController) ->
+            gattController.disconnect()
         }
+        mapBLEGatt.clear()
     }
 
 
@@ -494,5 +499,16 @@ object HCBle {
 
     fun getBluetoothDeviceByAddress(address: String): BluetoothDevice? {
         return bluetoothAdapter.getRemoteDevice(address)
+    }
+
+    fun unpairDevice(device: BluetoothDevice): Boolean {
+        try {
+            // BluetoothDevice 클래스의 removeBond 메서드 접근
+            val method = device.javaClass.getMethod("removeBond")
+            return method.invoke(device) as Boolean
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return false
     }
 }

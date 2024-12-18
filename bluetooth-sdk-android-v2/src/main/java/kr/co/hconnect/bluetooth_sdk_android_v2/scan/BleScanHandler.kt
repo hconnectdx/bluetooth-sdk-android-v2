@@ -8,7 +8,6 @@ class BleScanHandler(onScanResult: (ScanResult) -> Unit) {
     private val _leScanCallback: ScanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             super.onScanResult(callbackType, result)
-            Log.d("BleScanHandler", "onScanResult: $result")
             onScanResult.invoke(result)
         }
     }
