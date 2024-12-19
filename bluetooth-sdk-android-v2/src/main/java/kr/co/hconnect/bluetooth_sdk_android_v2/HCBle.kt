@@ -20,7 +20,6 @@ import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
@@ -29,7 +28,6 @@ import kr.co.hconnect.bluetooth_sdk_android_v2.gatt.GATTController
 import kr.co.hconnect.bluetooth_sdk_android_v2.gatt.GATTState
 import kr.co.hconnect.bluetooth_sdk_android_v2.scan.BleScanHandler
 import kr.co.hconnect.bluetooth_sdk_android_v2.util.Logger
-import java.util.UUID
 
 @SuppressLint("MissingPermission")
 object HCBle {
@@ -40,14 +38,9 @@ object HCBle {
     private lateinit var bluetoothManager: BluetoothManager
     private lateinit var bluetoothAdapter: BluetoothAdapter
     private lateinit var bluetoothLeScanner: BluetoothLeScanner
-    private var bluetoothGatt: BluetoothGatt? = null
 
     private var scanning = false
-    private lateinit var scanHandler: BleScanHandler
-
-//    private lateinit var gattService: GATTService
-
-
+    private var scanHandler: BleScanHandler? = null
     private var mapBLEGatt = mutableMapOf<String, GATTController>()
 
     // Stops scanning after 10 seconds.
@@ -86,7 +79,7 @@ object HCBle {
         if (!scanning) {
             scanJob = CoroutineScope(Dispatchers.IO).launch {
                 scanning = true
-                bluetoothLeScanner.startScan(scanHandler.leScanCallback)
+                bluetoothLeScanner.startScan(scanHandler?.leScanCallback)
 
                 try {
                     withTimeout(scanPeriod) {
@@ -94,15 +87,14 @@ object HCBle {
                             continuation.invokeOnCancellation {
                                 Log.d(TAG, "scanLeDevice: Canceled")
                                 scanning = false
-                                bluetoothLeScanner.stopScan(scanHandler.leScanCallback)
+                                bluetoothLeScanner.stopScan(scanHandler?.leScanCallback)
                                 onScanStop()
+                                scanJob?.cancel()
                             }
                         }
                     }
                 } finally {
-                    Log.d(TAG, "scanLeDevice: Canceled finnaly")
-                    scanning = false
-                    bluetoothLeScanner.stopScan(scanHandler.leScanCallback)
+                    scanStop()
                 }
             }
         }
@@ -114,7 +106,9 @@ object HCBle {
     fun scanStop() {
         if (scanning) {
             scanning = false
-            bluetoothLeScanner.stopScan(scanHandler.leScanCallback)
+            bluetoothLeScanner.stopScan(scanHandler?.leScanCallback)
+            scanJob?.cancel()
+            scanHandler = null // 핸들러 참조 해제
             Logger.d("scanStop: Stop scanning")
         }
     }
@@ -228,21 +222,21 @@ object HCBle {
         return mapBLEGatt[deviceAddress]
     }
 
-    private fun disableNotification() {
-        bluetoothGatt?.let { gatt ->
-            gatt.services.find { service ->
-                service.uuid == UUID.fromString("00001810-0000-1000-8000-00805f9b34fb")
-            }?.let { service ->
-                service.characteristics.forEach { char ->
-                    when (char.uuid) {
-                        UUID.fromString("00002a35-0000-1000-8000-00805f9b34fb") -> {
-                            gatt.setCharacteristicNotification(char, false)
-                        }
-                    }
-                }
-            }
-        }
-    }
+//    private fun disableNotification() {
+//        bluetoothGatt?.let { gatt ->
+//            gatt.services.find { service ->
+//                service.uuid == UUID.fromString("00001810-0000-1000-8000-00805f9b34fb")
+//            }?.let { service ->
+//                service.characteristics.forEach { char ->
+//                    when (char.uuid) {
+//                        UUID.fromString("00002a35-0000-1000-8000-00805f9b34fb") -> {
+//                            gatt.setCharacteristicNotification(char, false)
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//    }
 
     private fun logConnStateChange(title: String, gatt: BluetoothGatt?, newState: Int) {
         Logger.d("[${gatt?.device}] ${title}: ${BLEState.getStateString(newState)}")
@@ -286,7 +280,7 @@ object HCBle {
                     }
 
                     else -> {
-                        disableNotification()
+//                        disableNotification()
                         gatt?.close()
                     }
                 }
@@ -373,8 +367,10 @@ object HCBle {
         Logger.d("disconnect address: $address")
         val gattController: GATTController? = mapBLEGatt[address]
         gattController?.disconnect()
+        gattController?.bluetoothGatt?.close()
         mapBLEGatt.remove(address)
-        Logger.d("Disconnect success")
+
+        Logger.d("Bluetooth: GATT 연결 해제 및 리소스 정리 완료")
     }
 
     fun disconnectAll() {
@@ -383,7 +379,6 @@ object HCBle {
         }
         mapBLEGatt.clear()
     }
-
 
     /**
      * TODO: GATT Service 리스트를 반환합니다.

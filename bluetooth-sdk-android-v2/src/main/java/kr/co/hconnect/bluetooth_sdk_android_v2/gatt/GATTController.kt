@@ -35,6 +35,10 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
         }
     }
 
+    fun isGattInitialized(): Boolean {
+        return ::gattServiceList.isInitialized
+    }
+
     fun setGattServiceList(gattServiceList: List<BluetoothGattService>) {
         if (gattServiceList.isEmpty()) {
             Logger.e("getGattServiceList(): gattServiceList is not initialized")
