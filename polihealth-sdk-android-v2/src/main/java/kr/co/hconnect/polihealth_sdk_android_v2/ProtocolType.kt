@@ -1,4 +1,4 @@
-package kr.co.hconnect.polihealth_sdk_android
+package kr.co.hconnect.polihealth_sdk_android_v2
 
 enum class ProtocolType {
     PROTOCOL_1,

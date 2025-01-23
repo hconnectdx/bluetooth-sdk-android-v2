@@ -1,4 +1,4 @@
-package kr.co.hconnect.polihealth_sdk_android.api
+package kr.co.hconnect.polihealth_sdk_android_v2.api
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray

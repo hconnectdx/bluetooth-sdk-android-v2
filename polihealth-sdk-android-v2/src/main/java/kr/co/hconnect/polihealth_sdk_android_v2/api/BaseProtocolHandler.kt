@@ -1,4 +1,4 @@
-package kr.co.hconnect.polihealth_sdk_android.api
+package kr.co.hconnect.polihealth_sdk_android_v2.api
 
 import android.content.ContentValues
 import android.content.Context
@@ -6,8 +6,7 @@ import android.os.Build
 import android.provider.MediaStore
 import android.util.Log
 import androidx.annotation.RequiresApi
-import kr.co.hconnect.polihealth_sdk_android.DateUtil
-import kr.co.hconnect.polihealth_sdk_android_v2.BuildConfig
+import kr.co.hconnect.polihealth_sdk_android_v2.DateUtil
 import java.io.OutputStream
 
 open class BaseProtocolHandler {

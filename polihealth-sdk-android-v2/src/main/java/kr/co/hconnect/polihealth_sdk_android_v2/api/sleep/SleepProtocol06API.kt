@@ -1,4 +1,4 @@
-package kr.co.hconnect.polihealth_sdk_android.api.sleep
+package kr.co.hconnect.polihealth_sdk_android_v2.api.sleep
 
 import android.content.Context
 import android.net.Uri
@@ -15,8 +15,8 @@ import io.ktor.http.HttpHeaders
 import io.ktor.util.AttributeKey
 import io.ktor.util.InternalAPI
 import kotlinx.coroutines.runBlocking
-import kr.co.hconnect.polihealth_sdk_android.PoliClient
-import kr.co.hconnect.polihealth_sdk_android.api.BaseProtocolHandler
+import kr.co.hconnect.polihealth_sdk_android_v2.PoliClient
+import kr.co.hconnect.polihealth_sdk_android_v2.api.BaseProtocolHandler
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.SleepResponse
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.toSleepResponse
 

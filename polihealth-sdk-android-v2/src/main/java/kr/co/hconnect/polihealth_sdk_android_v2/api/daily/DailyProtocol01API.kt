@@ -1,25 +1,19 @@
 package kr.co.hconnect.polihealth_sdk_android_v2.api.daily
 
-import android.content.ContentValues
 import android.content.Context
 import android.os.Build
-import android.os.Environment
-import android.provider.MediaStore
 import android.util.Log
 import androidx.annotation.RequiresApi
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.util.AttributeKey
-import kr.co.hconnect.polihealth_sdk_android.DateUtil
-import kr.co.hconnect.polihealth_sdk_android.PoliClient
-import kr.co.hconnect.polihealth_sdk_android.api.dto.request.LTMRequest
+import kr.co.hconnect.polihealth_sdk_android_v2.DateUtil
+import kr.co.hconnect.polihealth_sdk_android_v2.PoliClient
 import kr.co.hconnect.polihealth_sdk_android_v2.api.SaveUtil
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.LTMModel
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.request.LTMRequest
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily1Response
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.toDaily1Response
-import java.io.File
-import java.io.FileOutputStream
-import java.io.OutputStream
 
 object DailyProtocol01API {
     var ltmModel: LTMModel? = null

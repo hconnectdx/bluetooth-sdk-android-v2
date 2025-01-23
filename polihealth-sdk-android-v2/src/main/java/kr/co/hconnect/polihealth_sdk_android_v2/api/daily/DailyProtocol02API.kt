@@ -1,11 +1,6 @@
 package kr.co.hconnect.polihealth_sdk_android_v2.api.daily
 
-import android.content.ContentValues
 import android.content.Context
-import android.os.Build
-import android.provider.MediaStore
-import android.util.Log
-import androidx.annotation.RequiresApi
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.post
@@ -13,12 +8,11 @@ import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.util.AttributeKey
 import io.ktor.util.InternalAPI
-import kr.co.hconnect.polihealth_sdk_android.DateUtil
-import kr.co.hconnect.polihealth_sdk_android.PoliClient
+import kr.co.hconnect.polihealth_sdk_android_v2.DateUtil
+import kr.co.hconnect.polihealth_sdk_android_v2.PoliClient
 import kr.co.hconnect.polihealth_sdk_android_v2.api.SaveUtil
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily2Response
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.toDaily2Response
-import java.io.OutputStream
 
 object DailyProtocol02API {
 

@@ -1,18 +1,17 @@
-package kr.co.hconnect.polihealth_sdk_android.service.sleep
+package kr.co.hconnect.polihealth_sdk_android_v2.service.sleep
 
 import android.content.Context
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
-import kr.co.hconnect.polihealth_sdk_android.DateUtil
+import kr.co.hconnect.polihealth_sdk_android_v2.DateUtil
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.SleepEndResponse
-import kr.co.hconnect.polihealth_sdk_android.api.sleep.SleepProtocol06API
-import kr.co.hconnect.polihealth_sdk_android.api.sleep.SleepProtocol07API
-import kr.co.hconnect.polihealth_sdk_android.api.sleep.SleepProtocol08API
-import kr.co.hconnect.polihealth_sdk_android.api.sleep.SleepProtocol09API
-import kr.co.hconnect.polihealth_sdk_android.api.sleep.SleepSessionAPI
+import kr.co.hconnect.polihealth_sdk_android_v2.api.sleep.SleepProtocol06API
+import kr.co.hconnect.polihealth_sdk_android_v2.api.sleep.SleepProtocol07API
+import kr.co.hconnect.polihealth_sdk_android_v2.api.sleep.SleepProtocol08API
+import kr.co.hconnect.polihealth_sdk_android_v2.api.sleep.SleepProtocol09API
+import kr.co.hconnect.polihealth_sdk_android_v2.api.sleep.SleepSessionAPI
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
-import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily3Response
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.SleepResponse
 
 class SleepApiService {

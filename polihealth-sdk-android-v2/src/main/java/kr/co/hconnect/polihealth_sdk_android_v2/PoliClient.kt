@@ -1,4 +1,4 @@
-package kr.co.hconnect.polihealth_sdk_android
+package kr.co.hconnect.polihealth_sdk_android_v2
 
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
@@ -8,10 +8,8 @@ import io.ktor.client.request.HttpSendPipeline
 import io.ktor.client.request.header
 import io.ktor.client.statement.HttpReceivePipeline
 import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
 import io.ktor.http.content.OutgoingContent
 import io.ktor.http.encodedPath
-import io.ktor.serialization.kotlinx.KotlinxSerializationConverter
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.util.AttributeKey
 import io.ktor.util.toByteArray
@@ -37,7 +35,7 @@ object PoliClient {
         clientId: String,
         clientSecret: String
     ) {
-        this.baseUrl = baseUrl
+        PoliClient.baseUrl = baseUrl
         client = HttpClient(CIO) {
 
             defaultRequest {
@@ -71,7 +69,7 @@ object PoliClient {
      * 2. Response 정보를 찍어준다.
      */
     private fun addLoggerInterceptor() {
-        if (::client.isInitialized.not()) {
+        if (PoliClient::client.isInitialized.not()) {
             throw IllegalStateException("PoliClient is not initialized")
         }
         client.sendPipeline.intercept(HttpSendPipeline.Before) {

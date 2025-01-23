@@ -1,4 +1,4 @@
-package kr.co.hconnect.polihealth_sdk_android.api.dto.request
+package kr.co.hconnect.polihealth_sdk_android_v2.api.dto.request
 
 import kotlinx.serialization.Serializable
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.LTMModel

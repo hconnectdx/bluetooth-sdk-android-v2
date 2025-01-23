@@ -18,13 +18,12 @@ import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kr.co.hconnect.polihealth_sdk_android_v2.PoliBLE
-import kr.co.hconnect.polihealth_sdk_android.PoliClient
+import kr.co.hconnect.polihealth_sdk_android_v2.PoliClient
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.DailyProtocol01API
-import kr.co.hconnect.polihealth_sdk_android.service.sleep.SleepApiService
-import kr.co.hconnect.polihealth_sdk_android_app.service.sleep.DailyApiService
+import kr.co.hconnect.polihealth_sdk_android_v2.service.sleep.SleepApiService
+import kr.co.hconnect.polihealth_sdk_android_v2.service.daily.DailyApiService
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
 import kr.co.hconnect.polihealth_sdk_android_v2_example.device_detail.DeviceDetailActivity
 import kr.co.hconnect.polihealth_sdk_android_v2_example.permission.PermissionManager
@@ -250,7 +249,7 @@ class MainActivity : AppCompatActivity() {
             stopScan()
         }
 
-        
+
     }
 
     override fun onStart() {

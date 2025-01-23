@@ -1,5 +1,7 @@
 package kr.co.hconnect.polihealth_sdk_android.api.dto.response
 
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.BaseResponse
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.PoliResponse
 import org.json.JSONException
 import org.json.JSONObject
 

@@ -19,9 +19,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kr.co.hconnect.polihealth_sdk_android_v2.BLEState
 import kr.co.hconnect.polihealth_sdk_android_v2.PoliBLE
-import kr.co.hconnect.polihealth_sdk_android.ProtocolType
-import kr.co.hconnect.polihealth_sdk_android.api.dto.response.BaseResponse
-import kr.co.hconnect.polihealth_sdk_android.api.dto.response.PoliResponse
+import kr.co.hconnect.polihealth_sdk_android_v2.ProtocolType
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.BaseResponse
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.PoliResponse
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.SleepEndResponse
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily1Response
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily2Response

@@ -1,10 +1,10 @@
-package kr.co.hconnect.polihealth_sdk_android_app.service.sleep
+package kr.co.hconnect.polihealth_sdk_android_v2.service.daily
 
 import android.content.Context
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
-import kr.co.hconnect.polihealth_sdk_android.DateUtil
+import kr.co.hconnect.polihealth_sdk_android_v2.DateUtil
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.DailyProtocol01API
 import kr.co.hconnect.polihealth_sdk_android.api.daily.DailyProtocol03API
 import kr.co.hconnect.polihealth_sdk_android_v2.BuildConfig

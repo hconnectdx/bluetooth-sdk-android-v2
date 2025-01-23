@@ -3,8 +3,7 @@ package kr.co.hconnect.polihealth_sdk_android_v2
 import io.ktor.client.request.get
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import kr.co.hconnect.polihealth_sdk_android.PoliClient
-import kr.co.hconnect.polihealth_sdk_android.service.sleep.SleepApiService
+import kr.co.hconnect.polihealth_sdk_android_v2.service.sleep.SleepApiService
 import org.junit.Test
 
 /**
