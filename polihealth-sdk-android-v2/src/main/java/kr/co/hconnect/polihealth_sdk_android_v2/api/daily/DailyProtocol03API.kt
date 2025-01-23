@@ -1,4 +1,4 @@
-package kr.co.hconnect.polihealth_sdk_android.api.daily
+package kr.co.hconnect.polihealth_sdk_android_v2.api.daily
 
 import android.os.Build
 import androidx.annotation.RequiresApi
@@ -7,8 +7,8 @@ import io.ktor.client.request.setBody
 import io.ktor.util.AttributeKey
 import kotlinx.coroutines.runBlocking
 import kr.co.hconnect.polihealth_sdk_android_v2.PoliClient
-import kr.co.hconnect.polihealth_sdk_android.api.dto.request.HRSpO2Request
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
+import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.request.HRSpO2Request
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.Daily3Response
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.toDaily3Response
 

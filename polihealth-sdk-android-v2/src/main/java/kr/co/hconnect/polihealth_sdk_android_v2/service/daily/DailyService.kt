@@ -6,7 +6,7 @@ import android.util.Log
 import androidx.annotation.RequiresApi
 import kr.co.hconnect.polihealth_sdk_android_v2.DateUtil
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.DailyProtocol01API
-import kr.co.hconnect.polihealth_sdk_android.api.daily.DailyProtocol03API
+import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.DailyProtocol03API
 import kr.co.hconnect.polihealth_sdk_android_v2.BuildConfig
 import kr.co.hconnect.polihealth_sdk_android_v2.api.SaveUtil
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.LTMModel

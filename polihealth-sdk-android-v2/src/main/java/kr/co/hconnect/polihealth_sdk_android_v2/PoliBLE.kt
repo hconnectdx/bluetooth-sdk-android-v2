@@ -154,6 +154,10 @@ object PoliBLE {
                                         }
                                     } catch (e: Exception) {
                                         e.printStackTrace()
+                                        onReceive.invoke(
+                                            ProtocolType.PROTOCOL_6_ERROR,
+                                            null
+                                        )
                                     }
                                 }
                             }
@@ -174,6 +178,10 @@ object PoliBLE {
                                         }
                                     } catch (e: Exception) {
                                         e.printStackTrace()
+                                        onReceive.invoke(
+                                            ProtocolType.PROTOCOL_7_ERROR,
+                                            null
+                                        )
                                     }
                                 }
                             }
@@ -194,7 +202,11 @@ object PoliBLE {
                                             )
                                         }
                                     } catch (e: Exception) {
-                                        e.printStackTrace()
+
+                                        onReceive.invoke(
+                                            ProtocolType.PROTOCOL_8_ERROR,
+                                            null
+                                        )
                                     }
                                 }
                             }
@@ -215,6 +227,11 @@ object PoliBLE {
                                     }
                                 } catch (e: Exception) {
                                     e.printStackTrace()
+
+                                    onReceive.invoke(
+                                        ProtocolType.PROTOCOL_9_ERROR,
+                                        null
+                                    )
                                 }
                             }
                         }
