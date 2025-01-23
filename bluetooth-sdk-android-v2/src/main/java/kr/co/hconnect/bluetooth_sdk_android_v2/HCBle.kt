@@ -16,6 +16,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.Build
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -177,7 +178,8 @@ object HCBle {
         onWriteCharacteristic: ((status: Int, characteristic: BluetoothGattCharacteristic?) -> Unit)? = null,
         onSubscriptionState: ((state: Boolean) -> Unit)? = null,
         onReceive: ((characteristic: BluetoothGattCharacteristic) -> Unit)? = null,
-        useBondingChangeState: Boolean = true
+        useBondingChangeState: Boolean = true,
+        isAutoConnect: Boolean = false,
     ) {
 
         val bondStateReceiver = object : BroadcastReceiver() {
@@ -213,7 +215,8 @@ object HCBle {
                 onReadCharacteristic,
                 onWriteCharacteristic,
                 onSubscriptionState,
-                onReceive
+                onReceive,
+                isAutoConnect
             )
         )
     }
@@ -221,22 +224,6 @@ object HCBle {
     fun getGattController(deviceAddress: String): GATTController? {
         return mapBLEGatt[deviceAddress]
     }
-
-//    private fun disableNotification() {
-//        bluetoothGatt?.let { gatt ->
-//            gatt.services.find { service ->
-//                service.uuid == UUID.fromString("00001810-0000-1000-8000-00805f9b34fb")
-//            }?.let { service ->
-//                service.characteristics.forEach { char ->
-//                    when (char.uuid) {
-//                        UUID.fromString("00002a35-0000-1000-8000-00805f9b34fb") -> {
-//                            gatt.setCharacteristicNotification(char, false)
-//                        }
-//                    }
-//                }
-//            }
-//        }
-//    }
 
     private fun logConnStateChange(title: String, gatt: BluetoothGatt?, newState: Int) {
         Logger.d("[${gatt?.device}] ${title}: ${BLEState.getStateString(newState)}")
@@ -256,13 +243,6 @@ object HCBle {
         onReceive: ((characteristic: BluetoothGattCharacteristic) -> Unit)? = null,
         autoConnect: Boolean = false
     ): BluetoothGatt {
-        // GATT 연결 전에 페어링 상태 확인
-//        if (device.bondState == BluetoothDevice.BOND_BONDED) {
-//            Log.d("Bluetooth", "장치가 이미 페어링된 상태입니다.")
-//        } else {
-//            Log.d("Bluetooth", "장치가 페어링 되지 않았습니다. createBond() 호출.")
-//            device.createBond() // 페어링 요청
-//        }
 
         return device.connectGatt(appContext, autoConnect, object : BluetoothGattCallback() {
 
@@ -280,8 +260,7 @@ object HCBle {
                     }
 
                     else -> {
-//                        disableNotification()
-                        gatt?.close()
+                        if (!autoConnect) gatt?.close()
                     }
                 }
 
@@ -505,5 +484,32 @@ object HCBle {
             e.printStackTrace()
         }
         return false
+    }
+
+    /**
+     * TODO: Bluetooth를 켜거나 끕니다. (Android 9(P) 이하에서만 사용 가능)
+     */
+    fun setBluetoothOnOff(isOn: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val message = "Android 10(Q) 미만에서만 Bluetooth를 켤 수 있습니다."
+            Logger.d("setBluetoothOn: $message")
+        }
+
+        val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
+        if (bluetoothAdapter == null) {
+            val message = "Bluetooth is not supported on this device."
+            Logger.d("setBluetoothOn: $message")
+
+        }
+
+        if (isOn) {
+            val message = "Bluetooth ON."
+            Logger.d("setBluetoothOn: $message")
+            bluetoothAdapter.enable() // Bluetooth 켜기
+        } else {
+            val message = "Bluetooth OFF."
+            Logger.d("setBluetoothOn: $message")
+            bluetoothAdapter.disable() // Bluetooth 끄기
+        }
     }
 }

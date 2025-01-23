@@ -69,9 +69,6 @@ object PoliBLE {
             onBondState = { bondState ->
                 onBondState.invoke(bondState)
             },
-            onWriteCharacteristic = {
-                Log.d(TAG, "Write Characteristic")
-            },
             onSubscriptionState = { state ->
                 onSubscriptionState.invoke(state)
             },

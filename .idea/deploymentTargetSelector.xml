@@ -4,10 +4,10 @@
     <selectionStates>
       <SelectionState runConfigName="polihealth-sdk-android-v2-example">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2024-11-01T05:08:20.286143Z">
+        <DropdownSelection timestamp="2024-12-13T01:51:14.549288Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="PhysicalDevice" identifier="serial=DYJUBV1TFR" />
+              <DeviceId pluginId="PhysicalDevice" identifier="serial=4RV4W6W9GI" />
             </handle>
           </Target>
         </DropdownSelection>

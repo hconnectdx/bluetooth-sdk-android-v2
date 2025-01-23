@@ -75,9 +75,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
 
     implementation("org.slf4j:slf4j-simple:1.7.30")
-//    implementation("kr.co.hconnect:bluetooth-sdk-android-v2:0.0.19")
+    implementation(libs.bluetooth.sdk.android.v2)
 
-    implementation(project(":bluetooth-sdk-android-v2"))
+//    implementation(project(":bluetooth-sdk-android-v2"))
 }
 
 
@@ -98,7 +98,7 @@ afterEvaluate {
     publishing {
         publications {
             register<MavenPublication>("release") {
-                groupId = projectGroupId
+                groupId = projectGroupId // 폴리헬스 에 최신 ble sdk 적용하는중ㅁㄴ이랴ㅓㅁㄴㅇ리ㅏㅁ람ㄴㅇㄹㅁㄴ
                 artifactId = projectArtifactId
                 version = projectVersion
                 pom.packaging = "aar"
