@@ -4,6 +4,7 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGattService
 import android.bluetooth.le.ScanResult
 import android.content.Context
+import android.location.Address
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
@@ -361,5 +362,13 @@ object PoliBLE {
 
     fun getBondedDevices(): List<BluetoothDevice> {
         return HCBle.getBondedDevices()
+    }
+
+    fun deconnect(address: String) {
+        HCBle.disconnect(address)
+    }
+
+    fun disconnectAll() {
+        HCBle.disconnectAll()
     }
 }

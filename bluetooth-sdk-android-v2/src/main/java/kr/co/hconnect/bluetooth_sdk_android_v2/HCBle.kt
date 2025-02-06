@@ -512,4 +512,8 @@ object HCBle {
             bluetoothAdapter.disable() // Bluetooth 끄기
         }
     }
+
+    fun destroy() {
+        disconnectAll()
+    }
 }
