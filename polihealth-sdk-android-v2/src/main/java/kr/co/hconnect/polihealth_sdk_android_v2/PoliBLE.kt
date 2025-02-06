@@ -114,10 +114,17 @@ object PoliBLE {
                                 try {
                                     val response: SleepResponse =
                                         SleepApiService().sendStartSleep()
+
+                                    var type = ProtocolType.PROTOCOL_4_SLEEP_START
+
+                                    if (response.retCd != "0")
+                                        type = ProtocolType.PROTOCOL_4_SLEEP_START_ERROR
+
                                     onReceive.invoke(
-                                        ProtocolType.PROTOCOL_4_SLEEP_START,
+                                        type,
                                         response
                                     )
+
                                 } catch (e: Exception) {
                                     e.printStackTrace()
                                 }
@@ -129,8 +136,13 @@ object PoliBLE {
                                 try {
                                     val response: SleepEndResponse =
                                         SleepApiService().sendEndSleep()
+                                    var type = ProtocolType.PROTOCOL_5_SLEEP_END
+
+                                    if (response.retCd != "0")
+                                        type = ProtocolType.PROTOCOL_5_SLEEP_END_ERROR
+
                                     onReceive.invoke(
-                                        ProtocolType.PROTOCOL_5_SLEEP_END,
+                                        type,
                                         response
                                     )
                                 } catch (e: Exception) {

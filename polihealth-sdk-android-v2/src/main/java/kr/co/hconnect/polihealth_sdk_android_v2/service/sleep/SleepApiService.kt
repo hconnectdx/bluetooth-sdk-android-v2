@@ -18,11 +18,29 @@ class SleepApiService {
     private val TAG = "SleepApiService"
 
     suspend fun sendStartSleep(): SleepResponse {
-        return SleepSessionAPI.requestSleepStart()
+        return try {
+            SleepSessionAPI.requestSleepStart()
+        } catch (e: Exception) {
+            Log.e(TAG, "sendStartSleep: ${e.message}")
+            SleepResponse().apply {
+                retCd = "500"
+                retMsg = e.message ?: "Unknown error"
+                resDate = DateUtil.getCurrentDateTime()
+            }
+        }
     }
 
     suspend fun sendEndSleep(): SleepEndResponse {
-        return SleepSessionAPI.requestSleepEnd()
+        return try {
+            SleepSessionAPI.requestSleepEnd()
+        } catch (e: Exception) {
+            Log.e(TAG, "sendEndSleep: ${e.message}")
+            SleepEndResponse().apply {
+                retCd = "500"
+                retMsg = e.message ?: "Unknown error"
+                resDate = DateUtil.getCurrentDateTime()
+            }
+        }
     }
 
     /**
