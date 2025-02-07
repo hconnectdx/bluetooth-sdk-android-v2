@@ -173,6 +173,11 @@ object PoliBLE {
                                         )
                                     }
                                 }
+                            } else {
+                                onReceive.invoke(
+                                    ProtocolType.PROTOCOL_6,
+                                    null
+                                )
                             }
                         }
 
@@ -197,6 +202,11 @@ object PoliBLE {
                                         )
                                     }
                                 }
+                            } else {
+                                onReceive.invoke(
+                                    ProtocolType.PROTOCOL_7,
+                                    null
+                                )
                             }
                         }
 
@@ -222,6 +232,11 @@ object PoliBLE {
                                         )
                                     }
                                 }
+                            } else {
+                                onReceive.invoke(
+                                    ProtocolType.PROTOCOL_8,
+                                    null
+                                )
                             }
                         }
 
