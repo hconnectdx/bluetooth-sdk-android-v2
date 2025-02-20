@@ -90,9 +90,11 @@ val projectVersion: String = projectProps.getProperty("version")
 val projectGroupId: String = projectProps.getProperty("publication_group_id")
 val projectArtifactId: String = projectProps.getProperty("publication_artifact_id")
 
-val githubUrl: String = projectProps.getProperty("github_url")
-val githubUsername: String = projectProps.getProperty("github_user_name")
-val githubAccessToken: String = projectProps.getProperty("github_access_token")
+val rootProjectProps = Properties()
+rootProjectProps.load(FileInputStream(project.file("../local.properties")))
+val githubUrl: String = rootProjectProps.getProperty("githubUrl")
+val githubUsername: String = rootProjectProps.getProperty("githubUsername")
+val githubAccessToken: String = rootProjectProps.getProperty("githubAccessToken")
 
 afterEvaluate {
     publishing {
