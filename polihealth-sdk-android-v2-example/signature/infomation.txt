@@ -1,0 +1,12 @@
+keystore
+
+key file : polihealth-sdk-android-v2-example
+password : hconnect2025
+
+Alias : polihealth-sdk-android
+Alias Password : hconnect2025
+
+Organization : HealthConnect
+
+
+- MD5, SHA1, SHA256 데이터는 Gradle -> Tasks -> android -> signingReport 를 수행하면 터미널에서 확인 가능

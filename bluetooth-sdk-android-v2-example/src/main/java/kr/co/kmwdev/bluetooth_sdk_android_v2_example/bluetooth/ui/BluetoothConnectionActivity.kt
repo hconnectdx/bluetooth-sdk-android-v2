@@ -5,7 +5,6 @@ import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.databinding.DataBindingUtil
 import androidx.lifecycle.ViewModelProvider
-import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.CoroutineScope
@@ -17,7 +16,7 @@ import kr.co.hconnect.bluetooth_sdk_android_v2.HCBle
 import kr.co.kmwdev.bluetooth_sdk_android_v2_example.bluetooth.ble_sdk.BleSdkManager
 import kr.co.kmwdev.bluetooth_sdk_android_v2_example.bluetooth.model.ScanResultModel
 import kr.co.kmwdev.bluetooth_sdk_android_v2_example.bluetooth.ui.connectable_adapter.BluetoothScanListAdapter
-import kr.co.hconnect.snuh.mhd.bluetooth.viewmodel.BluetoothConnectionViewModel
+import kr.co.kmwdev.bluetooth_sdk_android_v2_example.bluetooth.viewmodel.BluetoothConnectionViewModel
 import kr.co.kmwdev.bluetooth_sdk_android_v2_example.util.Logger
 import kr.co.kmwdev.bluetooth_sdk_android_v2_example.R
 import kr.co.kmwdev.bluetooth_sdk_android_v2_example.databinding.ActivityBluetoothConnectionBinding

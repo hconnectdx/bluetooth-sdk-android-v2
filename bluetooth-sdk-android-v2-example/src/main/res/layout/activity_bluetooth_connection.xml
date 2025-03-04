@@ -8,7 +8,7 @@
 
         <variable
             name="vm"
-            type="kr.co.hconnect.snuh.mhd.bluetooth.viewmodel.BluetoothConnectionViewModel" />
+            type="kr.co.kmwdev.bluetooth_sdk_android_v2_example.bluetooth.viewmodel.BluetoothConnectionViewModel" />
 
         <import type="android.view.View" />
     </data>

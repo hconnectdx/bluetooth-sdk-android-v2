@@ -1,9 +1,7 @@
-package kr.co.hconnect.snuh.mhd.bluetooth.viewmodel
+package kr.co.kmwdev.bluetooth_sdk_android_v2_example.bluetooth.viewmodel
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
-import android.bluetooth.le.ScanResult
-import android.content.Context
 import android.util.Log
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -343,12 +341,15 @@ class BluetoothConnectionViewModel : ViewModel() {
                 gattServiceList.forEach {
                     Logger.d("Service UUID: ${it.uuid}")
                     if (it.uuid.toString() == "0000ffe0-0000-1000-8000-00805f9b34fb") {
-                        HCBle.setServiceUUID(selDevice.address, it.uuid.toString())
+                        HCBle.getGattController(selDevice.address)
+                            ?.setTargetServiceUUID(it.uuid.toString())
 
                         it.characteristics.forEach { c ->
                             if (c.uuid.toString() == "0000ffe1-0000-1000-8000-00805f9b34fb") {
-                                HCBle.setCharacteristicUUID(selDevice.address, c.uuid.toString())
-                                HCBle.setCharacteristicNotification(selDevice.address, true)
+                                HCBle.getGattController(selDevice.address)
+                                    ?.setTargetCharacteristicUUID(it.uuid.toString())
+                                HCBle.getGattController(selDevice.address)
+                                    ?.setCharacteristicNotification(true)
                             }
                         }
                     }
@@ -361,8 +362,8 @@ class BluetoothConnectionViewModel : ViewModel() {
             onReadCharacteristic = {
                 Logger.e("onReadCharacteristic: $it")
             },
-            onWriteCharacteristic = {
-                Logger.d("onWriteCharacteristic: $it")
+            onWriteCharacteristic = { status, c ->
+                Logger.e("onWriteCharacteristic: $status")
             },
             useBondingChangeState = true,
         )

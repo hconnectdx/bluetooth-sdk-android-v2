@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.jetbrainsKotlinAndroid)
@@ -7,6 +10,21 @@ android {
     namespace = "kr.co.hconnect.polihealth_sdk_android_v2_example"
     compileSdk = 34
 
+    // 키스토어 프로퍼티 로드
+    val keystorePropertiesFile =
+        rootProject.file("./polihealth-sdk-android-v2-example/signature/keystore.properties")
+    val keystoreProperties = Properties()
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+
+    signingConfigs {
+        create("release") {
+            storeFile = file(keystoreProperties["storeFile"].toString())
+            storePassword = keystoreProperties["storePassword"].toString()
+            keyAlias = keystoreProperties["keyAlias"].toString()
+            keyPassword = keystoreProperties["keyPassword"].toString()
+        }
+    }
+//    /Users/gwagmin-u/Documents/0_workspace/aos/bluetoothlib/bluetooth-sdk-android-v2/polihealth-sdk-android-v2-example/signature
     defaultConfig {
         applicationId = "kr.co.hconnect.polihealth_sdk_android_v2_example"
         minSdk = 24
@@ -38,6 +56,17 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+
+
+            buildConfigField("String", "API_URL", "\"https://mapi.health-on.co.kr/\"")
+            buildConfigField("String", "CLIENT_ID", "\"659c95fd-900a-4a9a-8f61-1888334a3c7b\"")
+            buildConfigField(
+                "String",
+                "CLIENT_SECRET",
+                "\"eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJpbmZyYSI6IkhlYWx0aE9uLUxpdmUiLCJjbGllbnQtaWQiOiI2NTljOTVmZC05MDBhLTRhOWEtOGY2MS0xODg4MzM0YTNjN2IifQ.GV8Fg5pY-08GlZI0UUFLIqtrmlwnU7kQ-soN6VFlj_usXBex7mv3-vjkAZxV5Yb2MMecifUqwOQpikyirX9aBw\""
+            )
+            signingConfig = signingConfigs.getByName("release")
+
         }
     }
     compileOptions {
