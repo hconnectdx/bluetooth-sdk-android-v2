@@ -74,6 +74,9 @@ object PoliBLE {
             onReceive = { characteristic ->
                 val receivedArray = characteristic.value ?: ByteArray(0)
                 receivedArray.let { byteArray ->
+                    // 추가된 로그 출력
+
+
                     val protocolType = byteArray[0]
                     val dataOrder = byteArray[1]
 
@@ -85,16 +88,22 @@ object PoliBLE {
                         }
 
                         0x02.toByte() -> {
+                            Log.d(TAG, "Received ByteArray: ${
+                                byteArray.joinToString(separator = " ") { byte ->
+                                    "%02x".format(
+                                        byte
+                                    )
+                                }
+                            }")
+
                             DailyProtocol02API.apply {
                                 CoroutineScope(Dispatchers.IO).launch {
-                                    // 데이터 순서가 0x00 (처음) 이면 PROTOCOL_2_START 이벤트 발생
-                                    // 이전 데이터 순서가 0xFE면 맨 처음이 아님
                                     Log.d(TAG, "DataOrder_: ${dataOrder.toHexString()}")
                                     if (prevByte != 0xFE.toByte() && dataOrder == 0x00.toByte()) {
                                         onReceive.invoke(ProtocolType.PROTOCOL_2_START, null)
                                     }
                                     prevByte = dataOrder
-                                    addByte(removeFrontTwoBytes(byteArray, 2))
+                                    addByte2(removeFrontTwoBytes(byteArray, 2))
 
                                     // 데이터 순서가 0xFF (마지막) 이면 PROTOCOL_2 전송 이벤트 발생
                                     if (dataOrder == 0xFF.toByte()) {
