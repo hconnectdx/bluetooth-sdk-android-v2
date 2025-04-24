@@ -103,10 +103,11 @@ object PoliBLE {
                                         onReceive.invoke(ProtocolType.PROTOCOL_2_START, null)
                                     }
                                     prevByte = dataOrder
-                                    addByte2(removeFrontTwoBytes(byteArray, 2))
+                                    val isLast = dataOrder == 0xFF.toByte()
+                                    addByteNew(removeFrontTwoBytes(byteArray, 2), isLast = isLast)
 
                                     // 데이터 순서가 0xFF (마지막) 이면 PROTOCOL_2 전송 이벤트 발생
-                                    if (dataOrder == 0xFF.toByte()) {
+                                    if (isLast) {
                                         DailyServiceToApp.sendProtocol2ToApp(context, onReceive)
                                     }
                                 }

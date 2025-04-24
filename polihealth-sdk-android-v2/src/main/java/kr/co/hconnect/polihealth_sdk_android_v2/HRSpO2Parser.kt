@@ -4,7 +4,6 @@ import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
 
 object HRSpO2Parser {
     // 헥사값을 ASCII로 변환하는 함수
-    // 헥사값을 ASCII로 변환하는 함수
     fun hexToAscii(byteArray: ByteArray): String {
         val output = StringBuilder()
         for (byte in byteArray) {
