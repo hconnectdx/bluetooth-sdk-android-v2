@@ -76,7 +76,6 @@ class DailyApiService {
      * @param context : 전송 시, bin 파일을 저장하기 위한 컨텍스트. null일 경우, bin 파일 저장 X
      * @return SleepCommResponse
      */
-    @RequiresApi(Build.VERSION_CODES.Q)
     suspend fun sendProtocol02(context: Context? = null): Daily2Response {
         val protocol2Bytes = DailyProtocol02API.flush(context)
         if (protocol2Bytes.isNotEmpty()) {

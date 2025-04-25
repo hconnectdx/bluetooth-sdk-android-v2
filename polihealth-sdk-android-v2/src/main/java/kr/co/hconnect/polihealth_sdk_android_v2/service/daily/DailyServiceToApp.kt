@@ -34,7 +34,6 @@ object DailyServiceToApp {
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.Q)
     suspend fun sendProtocol2ToApp(
         context: Context?,
         onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
@@ -65,7 +64,6 @@ object DailyServiceToApp {
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.Q)
     suspend fun sendProtocol01ToApp(
         byteArray: ByteArray,
         context: Context?,

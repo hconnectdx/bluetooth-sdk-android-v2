@@ -59,240 +59,195 @@ object PoliBLE {
     ) {
         HCBle.connectToDevice(
             device = device,
-            onConnState = { state ->
-                onConnState.invoke(state)
-            },
-            onGattServiceState = { gatt, services ->
-                onGattServiceState.invoke(gatt, services)
-            },
-            onBondState = { bondState ->
-                onBondState.invoke(bondState)
-            },
-            onSubscriptionState = { state ->
-                onSubscriptionState.invoke(state)
-            },
+            onConnState = { state -> onConnState.invoke(state) },
+            onGattServiceState = { gatt, services -> onGattServiceState.invoke(gatt, services) },
+            onBondState = { bondState -> onBondState.invoke(bondState) },
+            onSubscriptionState = { state -> onSubscriptionState.invoke(state) },
             onReceive = { characteristic ->
                 val receivedArray = characteristic.value ?: ByteArray(0)
-                receivedArray.let { byteArray ->
-                    // 추가된 로그 출력
-
-
-                    val protocolType = byteArray[0]
-                    val dataOrder = byteArray[1]
-
-                    when (protocolType) {
-                        0x01.toByte() -> {
-                            CoroutineScope(Dispatchers.IO).launch {
-                                DailyServiceToApp.sendProtocol01ToApp(byteArray, context, onReceive)
-                            }
-                        }
-
-                        0x02.toByte() -> {
-                            Log.d(TAG, "Received ByteArray: ${
-                                byteArray.joinToString(separator = " ") { byte ->
-                                    "%02x".format(
-                                        byte
-                                    )
-                                }
-                            }")
-
-                            DailyProtocol02API.apply {
-                                CoroutineScope(Dispatchers.IO).launch {
-                                    Log.d(TAG, "DataOrder_: ${dataOrder.toHexString()}")
-                                    if (prevByte != 0xFE.toByte() && dataOrder == 0x00.toByte()) {
-                                        onReceive.invoke(ProtocolType.PROTOCOL_2_START, null)
-                                    }
-                                    prevByte = dataOrder
-                                    val isLast = dataOrder == 0xFF.toByte()
-                                    addByteNew(removeFrontTwoBytes(byteArray, 2), isLast = isLast)
-
-                                    // 데이터 순서가 0xFF (마지막) 이면 PROTOCOL_2 전송 이벤트 발생
-                                    if (isLast) {
-                                        DailyServiceToApp.sendProtocol2ToApp(context, onReceive)
-                                    }
-                                }
-                            }
-                        }
-
-                        0x03.toByte() -> {
-                            CoroutineScope(Dispatchers.IO).launch {
-                                DailyServiceToApp.sendProtocol03ToApp(byteArray, onReceive)
-                            }
-                        }
-
-                        0x04.toByte() -> {
-                            CoroutineScope(Dispatchers.IO).launch {
-                                try {
-                                    val response: SleepResponse =
-                                        SleepApiService().sendStartSleep()
-
-                                    var type = ProtocolType.PROTOCOL_4_SLEEP_START
-
-                                    if (response.retCd != "0")
-                                        type = ProtocolType.PROTOCOL_4_SLEEP_START_ERROR
-
-                                    onReceive.invoke(
-                                        type,
-                                        response
-                                    )
-
-                                } catch (e: Exception) {
-                                    e.printStackTrace()
-                                }
-                            }
-                        }
-
-                        0x05.toByte() -> {
-                            CoroutineScope(Dispatchers.IO).launch {
-                                try {
-                                    val response: SleepEndResponse =
-                                        SleepApiService().sendEndSleep()
-                                    var type = ProtocolType.PROTOCOL_5_SLEEP_END
-
-                                    if (response.retCd != "0")
-                                        type = ProtocolType.PROTOCOL_5_SLEEP_END_ERROR
-
-                                    onReceive.invoke(
-                                        type,
-                                        response
-                                    )
-                                } catch (e: Exception) {
-                                    e.printStackTrace()
-                                }
-                            }
-                        }
-
-                        0x06.toByte() -> {
-                            SleepProtocol06API.addByte(removeFrontTwoBytes(byteArray, 2))
-
-                            if (byteArray[1] == 0xFF.toByte()) {
-                                CoroutineScope(Dispatchers.IO).launch {
-                                    try {
-                                        val response = SleepApiService().sendProtocol06(context)
-                                        response?.let {
-                                            onReceive.invoke(
-                                                ProtocolType.PROTOCOL_6,
-                                                response
-                                            )
-                                        }
-                                    } catch (e: Exception) {
-                                        e.printStackTrace()
-                                        onReceive.invoke(
-                                            ProtocolType.PROTOCOL_6_ERROR,
-                                            null
-                                        )
-                                    }
-                                }
-                            } else {
-                                onReceive.invoke(
-                                    ProtocolType.PROTOCOL_6,
-                                    null
-                                )
-                            }
-                        }
-
-                        0x07.toByte() -> {
-                            SleepProtocol07API.addByte(removeFrontTwoBytes(byteArray, 2))
-
-                            if (byteArray[1] == 0xFF.toByte()) {
-                                CoroutineScope(Dispatchers.IO).launch {
-                                    try {
-                                        val response = SleepApiService().sendProtocol07(context)
-                                        response?.let {
-                                            onReceive.invoke(
-                                                ProtocolType.PROTOCOL_7,
-                                                response
-                                            )
-                                        }
-                                    } catch (e: Exception) {
-                                        e.printStackTrace()
-                                        onReceive.invoke(
-                                            ProtocolType.PROTOCOL_7_ERROR,
-                                            null
-                                        )
-                                    }
-                                }
-                            } else {
-                                onReceive.invoke(
-                                    ProtocolType.PROTOCOL_7,
-                                    null
-                                )
-                            }
-                        }
-
-                        0x08.toByte() -> {
-                            SleepProtocol08API.addByte(removeFrontTwoBytes(byteArray, 2))
-
-                            if (byteArray[1] == 0xFF.toByte()) {
-                                CoroutineScope(Dispatchers.IO).launch {
-                                    try {
-                                        val response: SleepResponse? =
-                                            SleepApiService().sendProtocol08(context)
-                                        response?.let {
-                                            onReceive.invoke(
-                                                ProtocolType.PROTOCOL_8,
-                                                response
-                                            )
-                                        }
-                                    } catch (e: Exception) {
-
-                                        onReceive.invoke(
-                                            ProtocolType.PROTOCOL_8_ERROR,
-                                            null
-                                        )
-                                    }
-                                }
-                            } else {
-                                onReceive.invoke(
-                                    ProtocolType.PROTOCOL_8,
-                                    null
-                                )
-                            }
-                        }
-
-                        0x09.toByte() -> {
-                            val hrSpO2: HRSpO2 =
-                                HRSpO2Parser.asciiToHRSpO2(removeFrontTwoBytes(byteArray, 1))
-
-                            CoroutineScope(Dispatchers.IO).launch {
-                                try {
-                                    val response = SleepApiService().sendProtocol09(hrSpO2)
-                                    response.let {
-                                        onReceive.invoke(
-                                            ProtocolType.PROTOCOL_9_HR_SpO2,
-                                            response
-                                        )
-                                    }
-                                } catch (e: Exception) {
-                                    e.printStackTrace()
-
-                                    onReceive.invoke(
-                                        ProtocolType.PROTOCOL_9_ERROR,
-                                        null
-                                    )
-                                }
-                            }
-                        }
-
-                        else -> {
-                            Log.e(
-                                TAG, "Unknown Protocol: ${
-                                    byteArray.joinToString(separator = " ") { byte ->
-                                        "%02x".format(
-                                            byte
-                                        )
-                                    }
-                                }"
-                            )
-                        }
-                    }
-                    val hexString =
-                        byteArray.joinToString(separator = " ") { byte -> "%02x".format(byte) }
-//                    Log.d("GATTService", "ByteSize: ${byteArray.size}")
-                }
-
+                processReceivedData(receivedArray, context, onReceive)
             }
         )
+    }
+
+    private fun processReceivedData(
+        byteArray: ByteArray,
+        context: Context?,
+        onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
+    ) {
+        if (byteArray.isEmpty()) return
+
+        val protocolType = byteArray[0]
+        val dataOrder = byteArray.getOrNull(1) ?: 0x00.toByte()
+
+        when (protocolType) {
+            0x01.toByte() -> handleProtocol01(byteArray, context, onReceive)
+            0x02.toByte() -> handleProtocol02(byteArray, dataOrder, context, onReceive)
+            0x03.toByte() -> handleProtocol03(byteArray, onReceive)
+            0x04.toByte() -> handleProtocol04(context, onReceive)
+            0x05.toByte() -> handleProtocol05(context, onReceive)
+            0x06.toByte() -> handleProtocol06(byteArray, context, onReceive)
+            0x07.toByte() -> handleProtocol07(byteArray, context, onReceive)
+            0x08.toByte() -> handleProtocol08(byteArray, context, onReceive)
+            0x09.toByte() -> handleProtocol09(byteArray, onReceive)
+            else -> logUnknownProtocol(byteArray)
+        }
+    }
+
+    private fun handleProtocol01(
+        byteArray: ByteArray,
+        context: Context?,
+        onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
+    ) {
+        CoroutineScope(Dispatchers.IO).launch {
+            DailyServiceToApp.sendProtocol01ToApp(byteArray, context, onReceive)
+        }
+    }
+
+    private fun handleProtocol02(
+        byteArray: ByteArray,
+        dataOrder: Byte,
+        context: Context?,
+        onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
+    ) {
+        Log.d(TAG, "Received ByteArray: ${byteArray.joinToString(" ") { "%02x".format(it) }}")
+        DailyProtocol02API.apply {
+            CoroutineScope(Dispatchers.IO).launch {
+                Log.d(TAG, "DataOrder_: ${dataOrder.toHexString()}")
+                if (prevByte != 0xFE.toByte() && dataOrder == 0x00.toByte()) {
+                    onReceive.invoke(ProtocolType.PROTOCOL_2_START, null)
+                }
+                prevByte = dataOrder
+                val isLast = dataOrder == 0xFF.toByte()
+                addByteNew(removeFrontTwoBytes(byteArray, 2), isLast = isLast)
+                if (isLast) {
+                    DailyServiceToApp.sendProtocol2ToApp(context, onReceive)
+                }
+            }
+        }
+    }
+
+    private fun handleProtocol03(
+        byteArray: ByteArray,
+        onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
+    ) {
+        CoroutineScope(Dispatchers.IO).launch {
+            DailyServiceToApp.sendProtocol03ToApp(byteArray, onReceive)
+        }
+    }
+
+    private fun handleProtocol04(
+        context: Context?,
+        onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
+    ) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val response = SleepApiService().sendStartSleep()
+                val type = if (response.retCd == "0") ProtocolType.PROTOCOL_4_SLEEP_START
+                else ProtocolType.PROTOCOL_4_SLEEP_START_ERROR
+                onReceive.invoke(type, response)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun handleProtocol05(
+        context: Context?,
+        onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
+    ) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val response = SleepApiService().sendEndSleep()
+                val type = if (response.retCd == "0") ProtocolType.PROTOCOL_5_SLEEP_END
+                else ProtocolType.PROTOCOL_5_SLEEP_END_ERROR
+                onReceive.invoke(type, response)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun handleProtocol06(
+        byteArray: ByteArray,
+        context: Context?,
+        onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
+    ) {
+        SleepProtocol06API.addByte(removeFrontTwoBytes(byteArray, 2))
+        if (byteArray[1] == 0xFF.toByte()) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val response = SleepApiService().sendProtocol06(context)
+                    onReceive.invoke(ProtocolType.PROTOCOL_6, response)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    onReceive.invoke(ProtocolType.PROTOCOL_6_ERROR, null)
+                }
+            }
+        } else {
+            onReceive.invoke(ProtocolType.PROTOCOL_6, null)
+        }
+    }
+
+    private fun handleProtocol07(
+        byteArray: ByteArray,
+        context: Context?,
+        onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
+    ) {
+        SleepProtocol07API.addByte(removeFrontTwoBytes(byteArray, 2))
+        if (byteArray[1] == 0xFF.toByte()) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val response = SleepApiService().sendProtocol07(context)
+                    onReceive.invoke(ProtocolType.PROTOCOL_7, response)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    onReceive.invoke(ProtocolType.PROTOCOL_7_ERROR, null)
+                }
+            }
+        } else {
+            onReceive.invoke(ProtocolType.PROTOCOL_7, null)
+        }
+    }
+
+    private fun handleProtocol08(
+        byteArray: ByteArray,
+        context: Context?,
+        onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
+    ) {
+        SleepProtocol08API.addByte(removeFrontTwoBytes(byteArray, 2))
+        if (byteArray[1] == 0xFF.toByte()) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val response = SleepApiService().sendProtocol08(context)
+                    onReceive.invoke(ProtocolType.PROTOCOL_8, response)
+                } catch (e: Exception) {
+                    onReceive.invoke(ProtocolType.PROTOCOL_8_ERROR, null)
+                }
+            }
+        } else {
+            onReceive.invoke(ProtocolType.PROTOCOL_8, null)
+        }
+    }
+
+    private fun handleProtocol09(
+        byteArray: ByteArray,
+        onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
+    ) {
+        val hrSpO2 = HRSpO2Parser.asciiToHRSpO2(removeFrontTwoBytes(byteArray, 1))
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val response = SleepApiService().sendProtocol09(hrSpO2)
+                onReceive.invoke(ProtocolType.PROTOCOL_9_HR_SpO2, response)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                onReceive.invoke(ProtocolType.PROTOCOL_9_ERROR, null)
+            }
+        }
+    }
+
+    private fun logUnknownProtocol(byteArray: ByteArray) {
+        Log.e(TAG, "Unknown Protocol: ${byteArray.joinToString(" ") { "%02x".format(it) }}")
     }
 
     private fun checkProtocol2Validate(it: Byte): Boolean {

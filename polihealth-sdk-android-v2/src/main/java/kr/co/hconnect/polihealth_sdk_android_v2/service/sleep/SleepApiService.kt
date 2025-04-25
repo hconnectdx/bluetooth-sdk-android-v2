@@ -1,9 +1,7 @@
 package kr.co.hconnect.polihealth_sdk_android_v2.service.sleep
 
 import android.content.Context
-import android.os.Build
 import android.util.Log
-import androidx.annotation.RequiresApi
 import kr.co.hconnect.polihealth_sdk_android_v2.DateUtil
 import kr.co.hconnect.polihealth_sdk_android.api.dto.response.SleepEndResponse
 import kr.co.hconnect.polihealth_sdk_android_v2.api.sleep.SleepProtocol06API
@@ -49,7 +47,6 @@ class SleepApiService {
      * @param context : 전송 시, bin 파일을 저장하기 위한 컨텍스트. null일 경우, bin 파일 저장 X
      * @return SleepCommResponse
      */
-    @RequiresApi(Build.VERSION_CODES.Q)
     suspend fun sendProtocol06(context: Context? = null): SleepResponse? {
         try {
             val protocol6Bytes = SleepProtocol06API.flush(context)
@@ -83,7 +80,6 @@ class SleepApiService {
      * @param context : 전송 시, bin 파일을 저장하기 위한 컨텍스트. null일 경우, bin 파일 저장 X
      * @return SleepCommResponse
      */
-    @RequiresApi(Build.VERSION_CODES.Q)
     suspend fun sendProtocol07(context: Context?): SleepResponse? {
         val protocol7Bytes = SleepProtocol07API.flush(context)
         if (protocol7Bytes.isNotEmpty()) {
@@ -111,7 +107,6 @@ class SleepApiService {
      * @param context : 전송 시, bin 파일을 저장하기 위한 컨텍스트. null일 경우, bin 파일 저장 X
      * @return SleepCommResponse
      */
-    @RequiresApi(Build.VERSION_CODES.Q)
     suspend fun sendProtocol08(context: Context? = null): SleepResponse? {
         val protocol8Bytes = SleepProtocol08API.flush(context)
         if (protocol8Bytes.isNotEmpty()) {
