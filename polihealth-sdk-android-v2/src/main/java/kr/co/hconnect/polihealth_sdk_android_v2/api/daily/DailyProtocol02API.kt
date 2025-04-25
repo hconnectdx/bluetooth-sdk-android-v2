@@ -63,7 +63,7 @@ object DailyProtocol02API {
     fun addByteNew(byteArray: ByteArray, isLast: Boolean = false) {
         // 상수 정의
         val maxChunks = if (isLast) 48 else 144 // FF일 경우 PPG ECG 24쌍, 평상시에는 72쌍
-        val offsetIndexStart = if (isLast) 47 else 234
+        val offsetIndexStart = if (isLast) 78 else 234
 
         // 1. 입력 데이터 준비 및 검증
         val dataSize = byteArray.size
@@ -73,10 +73,22 @@ object DailyProtocol02API {
         val offsetValue = extractOffsetValue(byteArray, isLast)
 
         // 3. 13비트 청크 추출 및 처리
-        val chunks = extractAndProcessChunks(byteArray, processingSize, offsetValue, maxChunks)
+        val intChunks = extractAndProcessChunks(byteArray, processingSize, offsetValue, maxChunks)
 
+        // IntArray를 ByteArray로 변환
+        val byteChunks = intChunks.flatMap { intToByteArray(it).toList() }.toByteArray()
         // 4. 원본 바이트 배열 저장
-        this.byteArray += chunks
+        this.byteArray += byteChunks
+    }
+
+
+    private fun intToByteArray(value: Int): ByteArray {
+        return byteArrayOf(
+            ((value shr 24) and 0xFF).toByte(),   // 최상위 바이트
+            ((value shr 16) and 0xFF).toByte(),   // 두 번째 바이트
+            ((value shr 8) and 0xFF).toByte(),    // 세 번째 바이트
+            (value and 0xFF).toByte()             // 최하위 바이트
+        )
     }
 
     /**
@@ -111,8 +123,8 @@ object DailyProtocol02API {
         processingSize: Int,
         offsetValue: Int,
         maxChunks: Int
-    ): ByteArray {
-        val processedChunks = ByteArray(maxChunks)
+    ): IntArray {
+        val processedChunks = IntArray(maxChunks)
         var bitPosition = 0
         var currentValue = 0
         var chunkIndex = 0
@@ -156,18 +168,17 @@ object DailyProtocol02API {
     /**
      * 하나의 13비트 청크를 처리
      */
-    private fun processChunk(originalValue: Int, chunkIndex: Int, offsetValue: Int): Byte {
+    private fun processChunk(originalValue: Int, chunkIndex: Int, offsetValue: Int): Int {
         val isEvenChunk = chunkIndex % 2 == 0
         val finalValue = when (isEvenChunk) {
             true -> (originalValue + offsetValue) and 0xFFFFFFFF.toInt()   // 짝수 청크: 원래 값 + 오프셋
-            false -> ((originalValue shl 3).toShort()
-                .toInt()) and 0xFFFFFFFF.toInt() // 홀수 청크: 3비트 쉬프트 후 int16_t 변환
+            false -> ((originalValue shl 3) and 0xFFFF) // 16비트만 유지하고 상위 비트는 0으로
         }
 
         // 로그 출력
         logChunkProcessing(originalValue, finalValue, chunkIndex)
 
-        return finalValue.toByte()
+        return finalValue
     }
 
     /**

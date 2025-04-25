@@ -44,7 +44,7 @@ object DailyServiceToApp {
                     TAG,
                     "sendProtocol2ToApp: ${DailyProtocol02API.byteArray.size}"
                 )
-                if (byteArray.size == 48_000) {
+                if (byteArray.size == 192_000) {
                     val response =
                         DailyApiService().sendProtocol02(context)
                     onReceive.invoke(ProtocolType.PROTOCOL_2, response)
