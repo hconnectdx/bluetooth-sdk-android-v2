@@ -1,6 +1,7 @@
 package kr.co.hconnect.polihealth_sdk_android_v2
 
 import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattService
 import android.bluetooth.le.ScanResult
 import android.content.Context
@@ -55,7 +56,8 @@ object PoliBLE {
         onGattServiceState: (gatt: Int, services: List<BluetoothGattService>) -> Unit,
         onBondState: (bondState: Int) -> Unit,
         onSubscriptionState: (state: Boolean) -> Unit,
-        onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
+        onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit,
+        onWriteCharacteristic:(state: Int, char: BluetoothGattCharacteristic) -> Unit,
     ) {
         HCBle.connectToDevice(
             device = device,
@@ -66,6 +68,11 @@ object PoliBLE {
             onReceive = { characteristic ->
                 val receivedArray = characteristic.value ?: ByteArray(0)
                 processReceivedData(receivedArray, context, onReceive)
+            },
+            onWriteCharacteristic = { state, char ->
+                char?.let {
+                    onWriteCharacteristic(state, char)
+                }
             }
         )
     }
