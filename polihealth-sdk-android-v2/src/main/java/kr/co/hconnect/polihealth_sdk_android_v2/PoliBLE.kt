@@ -147,7 +147,6 @@ object PoliBLE {
                 // Existing logic with user's requested modification for specific 0x00 start condition
                 if (prevByte != 0xFE.toByte() && dataOrder == 0x00.toByte()) {
                     onReceive.invoke(ProtocolType.PROTOCOL_2_START, null)
-                    onReceive.invoke(ProtocolType.PROTOCOL_2_ERROR_LACK_OF_DATA, null) // Added as per request
                 }
 
                 prevByte = dataOrder // Update prevByte for the next call's check
