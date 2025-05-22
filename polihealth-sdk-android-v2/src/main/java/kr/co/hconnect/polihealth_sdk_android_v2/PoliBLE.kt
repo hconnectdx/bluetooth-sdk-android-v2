@@ -47,6 +47,7 @@ object PoliBLE {
     private var expectedByte: Byte = 0x00
     private var protocol2Count = 0
     private var noMeaningData: Byte = 0x00 // 업데이트를 위한 의미없는 데이터
+    private var p2ExpectedOrder: Byte = 0x00.toByte() // Added for Protocol 02 order tracking
 
     @RequiresApi(Build.VERSION_CODES.Q)
     fun connectDevice(
@@ -121,11 +122,35 @@ object PoliBLE {
         DailyProtocol02API.apply {
             CoroutineScope(Dispatchers.IO).launch {
                 Log.d(TAG, "DataOrder_: ${dataOrder.toHexString()}")
+
+                val isLast = dataOrder == 0xFF.toByte()
+
+                if (isLast) {
+                    // Last packet (0xFF)
+                    p2ExpectedOrder = 0x00.toByte() // Reset for the next sequence
+                } else {
+                    // Packet is 0x00 to 0xFE
+                    if (dataOrder == 0x00.toByte()) {
+                        // For 0x00, the next expected packet is 0x01.
+                        // Specific error for "bad 0x00 start" is handled by the existing prevByte check below.
+                        p2ExpectedOrder = 0x01.toByte()
+                    } else {
+                        // Packet is 0x01 to 0xFE
+                        if (dataOrder != p2ExpectedOrder) {
+                            onReceive.invoke(ProtocolType.PROTOCOL_2_ERROR_LACK_OF_DATA, null)
+                        }
+                        // Update expectation for the next packet, even if there was loss, to resync.
+                        p2ExpectedOrder = (dataOrder + 1).toByte()
+                    }
+                }
+
+                // Existing logic with user's requested modification for specific 0x00 start condition
                 if (prevByte != 0xFE.toByte() && dataOrder == 0x00.toByte()) {
                     onReceive.invoke(ProtocolType.PROTOCOL_2_START, null)
+                    onReceive.invoke(ProtocolType.PROTOCOL_2_ERROR_LACK_OF_DATA, null) // Added as per request
                 }
-                prevByte = dataOrder
-                val isLast = dataOrder == 0xFF.toByte()
+
+                prevByte = dataOrder // Update prevByte for the next call's check
                 addByteNew(removeFrontTwoBytes(byteArray, 2), isLast = isLast)
                 if (isLast) {
                     DailyServiceToApp.sendProtocol2ToApp(context, onReceive)

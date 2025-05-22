@@ -194,6 +194,9 @@ class DeviceDetailActivity : AppCompatActivity() {
                         tvStatus.text = "Status: Unsubscribed"
                     }
                 }
+            },
+            onWriteCharacteristic = { state, char ->
+
             }
         )
     }

@@ -190,11 +190,11 @@ object DailyProtocol02API {
         val binaryOriginal = originalValue.toBinaryString().padStart(13, '0')
         val binaryFinal = finalValue.toBinaryString().padStart(if (isEvenChunk) 24 else 16, '0')
 
-        Log.d(
-            TAG, "$chunkType Chunk[$chunkIndex]: " +
-                    "원래값=${originalValue} (0x${originalValue.toString(16)}, 이진수=${binaryOriginal}), " +
-                    "최종값=${finalValue} (0x${finalValue.toString(16)}, 이진수=${binaryFinal})"
-        )
+//        Log.d(
+//            TAG, "$chunkType Chunk[$chunkIndex]: " +
+//                    "원래값=${originalValue} (0x${originalValue.toString(16)}, 이진수=${binaryOriginal}), " +
+//                    "최종값=${finalValue} (0x${finalValue.toString(16)}, 이진수=${binaryFinal})"
+//        )
     }
 
     // Int를 이진수 문자열로 변환하는 확장 함수

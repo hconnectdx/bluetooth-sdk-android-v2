@@ -11,7 +11,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kr.co.hconnect.polihealth_sdk_android_v2.PoliBLE
 import kr.co.hconnect.polihealth_sdk_android_v2_example.R
-
 class CharacteristicDetailActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,7 +45,8 @@ class CharacteristicDetailActivity : AppCompatActivity() {
                 try {
                     val dataToWrite = byteArrayOf(0x02, 0x62, 0x03)
                     if (deviceAddress != null) {
-                        PoliBLE.writeCharacteristic(deviceAddress, dataToWrite)
+                        Log.d("asda", "ddd")
+                        PoliBLE.writeCharacteristic(deviceAddress, "ECG_RESTART".toByteArray())
                     }
                 } catch (e: Exception) {
                     Log.e("MainActivity", "error: $e")
