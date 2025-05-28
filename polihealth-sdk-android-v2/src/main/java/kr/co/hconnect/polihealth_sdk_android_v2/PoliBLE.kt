@@ -5,7 +5,6 @@ import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattService
 import android.bluetooth.le.ScanResult
 import android.content.Context
-import android.location.Address
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
@@ -14,14 +13,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kr.co.hconnect.bluetooth_sdk_android_v2.HCBle
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.PoliResponse
-import kr.co.hconnect.polihealth_sdk_android.api.dto.response.SleepEndResponse
 import kr.co.hconnect.polihealth_sdk_android_v2.api.sleep.SleepProtocol06API
 import kr.co.hconnect.polihealth_sdk_android_v2.api.sleep.SleepProtocol07API
 import kr.co.hconnect.polihealth_sdk_android_v2.api.sleep.SleepProtocol08API
 import kr.co.hconnect.polihealth_sdk_android_v2.service.sleep.SleepApiService
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.DailyProtocol02API
-import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.model.HRSpO2
-import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.SleepResponse
 import kr.co.hconnect.polihealth_sdk_android_v2.service.daily.DailyServiceToApp
 import kr.co.hconnect.polihealth_sdk_android_v2.utils.toHexString
 
@@ -59,8 +55,10 @@ object PoliBLE {
         onSubscriptionState: (state: Boolean) -> Unit,
         onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit,
         onWriteCharacteristic:(state: Int, char: BluetoothGattCharacteristic) -> Unit,
+        autoConnect: Boolean
     ) {
         HCBle.connectToDevice(
+            isAutoConnect = autoConnect,
             device = device,
             onConnState = { state -> onConnState.invoke(state) },
             onGattServiceState = { gatt, services -> onGattServiceState.invoke(gatt, services) },
