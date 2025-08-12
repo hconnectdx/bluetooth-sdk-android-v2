@@ -42,8 +42,8 @@ object PoliBLE {
 
     private var expectedByte: Byte = 0x00
     private var protocol2Count = 0
-    private var noMeaningData: Byte = 0x00 // 업데이트를 위한 의미없는 데이터
     private var p2ExpectedOrder: Byte = 0x00.toByte() // Added for Protocol 02 order tracking
+    private var p2IsFirstPacket: Boolean = true // 첫 번째 패킷 여부 추적
 
     @RequiresApi(Build.VERSION_CODES.Q)
     fun connectDevice(
@@ -126,24 +126,28 @@ object PoliBLE {
                 if (isLast) {
                     // Last packet (0xFF)
                     p2ExpectedOrder = 0x00.toByte() // Reset for the next sequence
+                    p2IsFirstPacket = true // 다음 시퀀스를 위해 리셋
                 } else {
                     // Packet is 0x00 to 0xFE
-                    if (dataOrder == 0x00.toByte()) {
-                        // For 0x00, the next expected packet is 0x01.
-                        // Specific error for "bad 0x00 start" is handled by the existing prevByte check below.
-                        p2ExpectedOrder = 0x01.toByte()
+                    if (p2IsFirstPacket) {
+                        // 첫 번째 패킷: 어떤 값이든 시작점으로 설정
+                        p2ExpectedOrder = (dataOrder + 1).toByte()
+                        p2IsFirstPacket = false
+                        Log.d(TAG, "First packet detected: ${dataOrder.toHexString()}, next expected: ${p2ExpectedOrder.toHexString()}")
                     } else {
-                        // Packet is 0x01 to 0xFE
+                        // 첫 번째 이후 패킷들: 순서 검증
                         if (dataOrder != p2ExpectedOrder) {
+                            Log.w(TAG, "Packet order mismatch. Expected: ${p2ExpectedOrder.toHexString()}, Received: ${dataOrder.toHexString()}")
                             onReceive.invoke(ProtocolType.PROTOCOL_2_ERROR_LACK_OF_DATA, null)
+                            return@launch // 에러 발생 시 처리 중단
                         }
-                        // Update expectation for the next packet, even if there was loss, to resync.
+                        // 다음 기대값 업데이트
                         p2ExpectedOrder = (dataOrder + 1).toByte()
                     }
                 }
 
-                // Existing logic with user's requested modification for specific 0x00 start condition
-                if (prevByte != 0xFE.toByte() && dataOrder == 0x00.toByte()) {
+                // 시작 조건 체크 (첫 번째 패킷이고 이전 바이트가 0xFE가 아닌 경우)
+                if (p2IsFirstPacket && prevByte != 0xFE.toByte()) {
                     onReceive.invoke(ProtocolType.PROTOCOL_2_START, null)
                 }
 

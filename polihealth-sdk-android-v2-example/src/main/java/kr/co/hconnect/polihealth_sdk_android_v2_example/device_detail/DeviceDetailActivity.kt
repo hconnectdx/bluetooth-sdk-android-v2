@@ -197,7 +197,8 @@ class DeviceDetailActivity : AppCompatActivity() {
             },
             onWriteCharacteristic = { state, char ->
 
-            }
+            },
+            autoConnect = true
         )
     }
 }
