@@ -124,34 +124,45 @@ object PoliBLE {
                 val isLast = dataOrder == 0xFF.toByte()
 
                 if (isLast) {
-                    // Last packet (0xFF)
-                    p2ExpectedOrder = 0x00.toByte() // Reset for the next sequence
-                    p2IsFirstPacket = true // 다음 시퀀스를 위해 리셋
+                    // 0xFF: 프로세스 종료 패킷
+                    Log.d(TAG, "Process termination packet received (0xFF)")
+                    p2ExpectedOrder = 0x00.toByte() // 다음 프로세스를 위해 리셋
+                    p2IsFirstPacket = true // 다음 프로세스를 위해 리셋
                 } else {
-                    // Packet is 0x00 to 0xFE
+                    // 0x00 to 0xFE 패킷 처리
                     if (p2IsFirstPacket) {
                         // 첫 번째 패킷: 어떤 값이든 시작점으로 설정
-                        p2ExpectedOrder = (dataOrder + 1).toByte()
+                        p2ExpectedOrder = if (dataOrder == 0xFE.toByte()) {
+                            0x00.toByte() // 0xFE 다음은 0x00
+                        } else {
+                            (dataOrder + 1).toByte()
+                        }
                         p2IsFirstPacket = false
                         Log.d(TAG, "First packet detected: ${dataOrder.toHexString()}, next expected: ${p2ExpectedOrder.toHexString()}")
                     } else {
-                        // 첫 번째 이후 패킷들: 순서 검증
+                        // 순서 검증
                         if (dataOrder != p2ExpectedOrder) {
                             Log.w(TAG, "Packet order mismatch. Expected: ${p2ExpectedOrder.toHexString()}, Received: ${dataOrder.toHexString()}")
                             onReceive.invoke(ProtocolType.PROTOCOL_2_ERROR_LACK_OF_DATA, null)
-                            return@launch // 에러 발생 시 처리 중단
+                            return@launch
                         }
-                        // 다음 기대값 업데이트
-                        p2ExpectedOrder = (dataOrder + 1).toByte()
+
+                        // 다음 기대값 업데이트 (순환 처리)
+                        p2ExpectedOrder = if (dataOrder == 0xFE.toByte()) {
+                            0x00.toByte() // 0xFE 다음은 0x00으로 순환
+                        } else {
+                            (dataOrder + 1).toByte()
+                        }
                     }
                 }
 
-                // 시작 조건 체크 (첫 번째 패킷이고 이전 바이트가 0xFE가 아닌 경우)
-                if (p2IsFirstPacket && prevByte != 0xFE.toByte()) {
+                // 시작 조건 체크: 0xFE 다음 0x00이거나, 첫 번째 패킷이면서 이전이 0xFE가 아닌 경우
+                if (dataOrder == 0x00.toByte() ||
+                    (p2IsFirstPacket && prevByte != 0xFE.toByte())) {
                     onReceive.invoke(ProtocolType.PROTOCOL_2_START, null)
                 }
 
-                prevByte = dataOrder // Update prevByte for the next call's check
+                prevByte = dataOrder
                 addByteNew(removeFrontTwoBytes(byteArray, 2), isLast = isLast)
                 if (isLast) {
                     DailyServiceToApp.sendProtocol2ToApp(context, onReceive)
