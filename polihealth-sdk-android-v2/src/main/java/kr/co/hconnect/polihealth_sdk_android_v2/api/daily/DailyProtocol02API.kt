@@ -79,6 +79,8 @@ object DailyProtocol02API {
         val byteChunks = intChunks.flatMap { intToByteArray(it).toList() }.toByteArray()
         // 4. 원본 바이트 배열 저장
         this.byteArray += byteChunks
+
+        Log.v(TAG, "p2 byte size: ${this.byteArray.size}")
     }
 
 
