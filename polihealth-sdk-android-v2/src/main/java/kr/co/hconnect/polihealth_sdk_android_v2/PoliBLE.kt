@@ -159,8 +159,8 @@ object PoliBLE {
         char?.let {
             Log.d(TAG, "특성 쓰기 완료: ${char.uuid}")
             // 재측정 시 상태 초기화
-            DailyProtocol02API.byteArray = byteArrayOf()
             resetProtocol02State()
+            prevByte = 0x00.toByte()
             onWriteCharacteristic(state, char)
         }
     }
@@ -262,8 +262,8 @@ object PoliBLE {
 
                 if (isLastPacket) {
                     Log.d(TAG, "Protocol 02 완료 - 앱으로 전송")
-                    handleLastPacket()
                     DailyServiceToApp.sendProtocol2ToApp(context, onReceive)
+                    handleLastPacket()
                 }
             }
         }
@@ -307,7 +307,7 @@ object PoliBLE {
         dataOrder: Byte,
         onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
     ) {
-        if (dataOrder != p2ExpectedOrder) {
+        if ((dataOrder != p2ExpectedOrder) && dataOrder != PROTOCOL_LAST_PACKET) {
             Log.w(
                 TAG,
                 "패킷 순서 오류 - 예상: ${p2ExpectedOrder.toHexString()}, 실제: ${dataOrder.toHexString()}"
@@ -325,15 +325,13 @@ object PoliBLE {
      * 시작 조건 검증
      */
     private fun checkStartCondition(
-        dataOrder: Byte,
         onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
     ) {
         Log.v(DailyProtocol02API.TAG, "prevByte: ${DailyProtocol02API.prevByte.toHexString()}")
 
         // 새 시퀀스 시작 조건:
-        // 1. 첫 번째 패킷이면서 이전 바이트가 0xFE가 아닌 경우 (진짜 새 시작)
-        // 2. 0xFE → 0x00 순환은 정상적인 흐름이므로 제외
-        val isNewSequenceStart = p2IsFirstPacket && prevByte != PROTOCOL_02_MAX_ORDER
+        // 모인 바이트 수가 0일 때
+        val isNewSequenceStart = DailyProtocol02API.byteArray.isEmpty()
 
         if (isNewSequenceStart) {
             Log.d(TAG, "새 시퀀스 시작 감지")
@@ -359,8 +357,8 @@ object PoliBLE {
     private fun resetProtocol02State() {
         DailyProtocol02API.byteArray = byteArrayOf()
         p2ExpectedOrder = PROTOCOL_02_RESET_ORDER
-        p2IsFirstPacket = true
         prevByte = PROTOCOL_02_RESET_ORDER
+        p2IsFirstPacket = true
 
         Log.v(TAG, "Protocol 02 상태 초기화")
     }
