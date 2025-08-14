@@ -15,9 +15,12 @@ import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.SleepResponse
 class SleepApiService {
     private val TAG = "SleepApiService"
 
-    suspend fun sendStartSleep(): SleepResponse {
+    /**
+     * session id를 저장하기 위한 sharedPreference용 context 가 필요함
+     */
+    suspend fun sendStartSleep(context: Context): SleepResponse {
         return try {
-            SleepSessionAPI.requestSleepStart()
+            SleepSessionAPI.requestSleepStart(context = context)
         } catch (e: Exception) {
             Log.e(TAG, "sendStartSleep: ${e.message}")
             SleepResponse().apply {
@@ -28,9 +31,12 @@ class SleepApiService {
         }
     }
 
-    suspend fun sendEndSleep(): SleepEndResponse {
+    /**
+     * session id를 꺼내오기 위한 sharedPreference용 context 가 필요함
+     */
+    suspend fun sendEndSleep(context: Context): SleepEndResponse {
         return try {
-            SleepSessionAPI.requestSleepEnd()
+            SleepSessionAPI.requestSleepEnd(context = context)
         } catch (e: Exception) {
             Log.e(TAG, "sendEndSleep: ${e.message}")
             SleepEndResponse().apply {

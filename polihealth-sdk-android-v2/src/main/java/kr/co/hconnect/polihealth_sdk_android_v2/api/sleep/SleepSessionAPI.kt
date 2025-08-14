@@ -1,5 +1,7 @@
 package kr.co.hconnect.polihealth_sdk_android_v2.api.sleep
 
+import android.content.Context
+import android.content.SharedPreferences
 import android.util.Log
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -22,7 +24,7 @@ object SleepSessionAPI {
      *
      * @return SleepStartResponse (sessionId)
      */
-    suspend fun requestSleepStart(): SleepResponse {
+    suspend fun requestSleepStart(context: Context): SleepResponse {
         val requestBody = RequestBody(
             reqDate = DateUtil.getCurrentDateTime(),
             userSno = PoliClient.userSno,
@@ -37,14 +39,57 @@ object SleepSessionAPI {
                 .toSleepResponse()
 
         PoliClient.sessionId = response.data?.sessionId ?: ""
+
+        // SleepSessionId 를 sharedPreference에 저장 함.
+        // 앱 종료 후, 백그라운드에서도 계속 사용하기 위함
+        saveSleepSessionId(context, PoliClient.sessionId)
+
         Log.d("SleepSessionAPI", "userSno: $PoliClient.userSno")
         Log.d("SleepSessionAPI", "sessionId: $PoliClient.sessionId")
 
         return response
     }
 
-    fun testSleepStart() = runBlocking {
-        requestSleepStart()
+    /**
+     * SleepSessionId를 SharedPreferences에 저장하는 함수
+     */
+    private fun saveSleepSessionId(context: Context, sessionId: String) {
+        try {
+            val sharedPreferences =
+                context.getSharedPreferences("sleep_session", Context.MODE_PRIVATE)
+
+            sharedPreferences.edit().apply {
+                putString("sleep_session_id", sessionId)
+                putLong("save_timestamp", System.currentTimeMillis()) // 저장 시간도 함께 저장
+                apply() // 비동기 저장
+            }
+
+            Log.d("SleepSessionAPI", "SleepSessionId saved to SharedPreferences: $sessionId")
+        } catch (e: Exception) {
+            Log.e("SleepSessionAPI", "Failed to save SleepSessionId to SharedPreferences", e)
+        }
+    }
+
+
+    /**
+     * SharedPreferences에서 SleepSessionId를 불러오는 함수
+     */
+    fun getSleepSessionId(context: Context): String? {
+        return try {
+            val sharedPreferences =
+                context.getSharedPreferences("sleep_session", Context.MODE_PRIVATE)
+            val sessionId = sharedPreferences.getString("sleep_session_id", null)
+            val saveTimestamp = sharedPreferences.getLong("save_timestamp", 0L)
+
+            Log.d(
+                "SleepSessionAPI",
+                "SleepSessionId loaded from SharedPreferences: $sessionId (saved at: $saveTimestamp)"
+            )
+            sessionId
+        } catch (e: Exception) {
+            Log.e("SleepSessionAPI", "Failed to load SleepSessionId from SharedPreferences", e)
+            null
+        }
     }
 
     /**
@@ -52,11 +97,11 @@ object SleepSessionAPI {
      *
      * @return SleepEndResponse (sleepQuality)
      */
-    suspend fun requestSleepEnd(): SleepEndResponse {
+    suspend fun requestSleepEnd(context: Context): SleepEndResponse {
         val requestBody = RequestBody(
             reqDate = DateUtil.getCurrentDateTime(),
             userSno = PoliClient.userSno,
-            sessionId = PoliClient.sessionId
+            sessionId = getSleepSessionId(context = context)
         )
 
         val response: SleepEndResponse =
@@ -65,9 +110,5 @@ object SleepSessionAPI {
                 .toSleepEndResponse()
 
         return response
-    }
-
-    fun testSleepEnd() = runBlocking {
-        requestSleepEnd()
     }
 }

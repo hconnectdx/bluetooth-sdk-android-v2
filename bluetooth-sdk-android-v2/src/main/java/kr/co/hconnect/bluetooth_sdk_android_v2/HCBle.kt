@@ -140,7 +140,6 @@ object HCBle {
         ) == BluetoothProfile.STATE_CONNECTED
     }
 
-
     fun getSelService(deviceAddress: String): BluetoothGattService? {
         val gattController: GATTController = mapBLEGatt[deviceAddress] ?: return null
         if (mapBLEGatt[deviceAddress] == null) {
@@ -151,13 +150,16 @@ object HCBle {
         return gattController.targetService
     }
 
-    fun getSelCharacteristic(deviceAddress: String): BluetoothGattCharacteristic? {
+    // 🔧 수정: targetCharacteristic → targetReadCharacteristic
+    fun getSelReadCharacteristic(deviceAddress: String): BluetoothGattCharacteristic? {
         val gattController: GATTController = mapBLEGatt[deviceAddress] ?: return null
-        if (mapBLEGatt[deviceAddress] == null) {
-            Logger.e("gattController is not initialized")
-            return null
-        }
-        return gattController.targetCharacteristic
+        return gattController.targetReadCharacteristic
+    }
+
+    // 🆕 추가: Write Characteristic 조회 함수
+    fun getSelWriteCharacteristic(deviceAddress: String): BluetoothGattCharacteristic? {
+        val gattController: GATTController = mapBLEGatt[deviceAddress] ?: return null
+        return gattController.targetWriteCharacteristic
     }
 
     /**
@@ -336,7 +338,6 @@ object HCBle {
         })
     }
 
-
     /**
      * TODO: 디바이스와 연결을 해제합니다.
      * TODO: 연결정보도 모두 삭제합니다. 이 메소드를 호출하면 자동연결 까지 해제 됩니다.
@@ -374,7 +375,6 @@ object HCBle {
      * 사용 하고자 하는 서비스 UUID를 설정합니다.
      * @param uuid
      */
-    @Deprecated("Use setTargetServiceUUID in GATTController")
     fun setTargetServiceUUID(deviceAddress: String, uuid: String) {
         val gattController: GATTController = mapBLEGatt[deviceAddress] ?: run {
             Log.e(TAG, "gattController is not initialized")
@@ -384,22 +384,34 @@ object HCBle {
     }
 
     /**
-     * TODO: 캐릭터리스틱 UUID를 설정합니다.
-     * 사용 하고자 하는 캐릭터리스틱 UUID를 설정합니다.
+     * TODO: Read 캐릭터리스틱 UUID를 설정합니다.
+     * 읽기용 캐릭터리스틱 UUID를 설정합니다.
      * @param characteristicUUID
      */
-    @Deprecated("Use setTargetCharacteristicUUID in GATTController")
-    fun setTargetCharacteristicUUID(deviceAddress: String, characteristicUUID: String) {
+    fun setTargetReadCharacteristicUUID(deviceAddress: String, characteristicUUID: String) {
         val gattController: GATTController = mapBLEGatt[deviceAddress] ?: run {
             Log.e(TAG, "gattController is not initialized")
             return
         }
-        gattController.setTargetCharacteristicUUID(characteristicUUID)
+        gattController.setTargetReadCharacteristicUUID(characteristicUUID)
+    }
+
+    /**
+     * TODO: Write 캐릭터리스틱 UUID를 설정합니다.
+     * 쓰기용 캐릭터리스틱 UUID를 설정합니다.
+     * @param characteristicUUID
+     */
+    fun setTargetWriteCharacteristicUUID(deviceAddress: String, characteristicUUID: String) {
+        val gattController: GATTController = mapBLEGatt[deviceAddress] ?: run {
+            Log.e(TAG, "gattController is not initialized")
+            return
+        }
+        gattController.setTargetWriteCharacteristicUUID(characteristicUUID)
     }
 
     /**
      * TODO: 캐릭터리스틱을 읽습니다.
-     * setCharacteristicUUID로 설정된 캐릭터리스틱을 읽습니다.
+     * setTargetReadCharacteristicUUID로 설정된 캐릭터리스틱을 읽습니다.
      */
     fun readCharacteristic(deviceAddress: String) {
         val gattController: GATTController = mapBLEGatt[deviceAddress] ?: run {
@@ -410,8 +422,8 @@ object HCBle {
     }
 
     /**
-     * TODO: 캐릭터리스틱을 쓰기합니다.
-     * setCharacteristicUUID로 설정된 캐릭터리스틱에 데이터를 쓰기합니다.
+     * TODO: 캐릭터리스틱에 데이터를 씁니다.
+     * setTargetWriteCharacteristicUUID로 설정된 캐릭터리스틱에 데이터를 씁니다.
      * @param data
      */
     fun writeCharacteristic(deviceAddress: String, data: ByteArray) {
@@ -424,7 +436,7 @@ object HCBle {
 
     /**
      * TODO: 캐릭터리스틱 알림을 설정합니다.
-     * setCharacteristicUUID로 설정된 캐릭터리스틱에 알림을 설정합니다.
+     * setTargetReadCharacteristicUUID로 설정된 캐릭터리스틱에 알림을 설정합니다.
      * @param isEnable
      */
     fun setCharacteristicNotification(

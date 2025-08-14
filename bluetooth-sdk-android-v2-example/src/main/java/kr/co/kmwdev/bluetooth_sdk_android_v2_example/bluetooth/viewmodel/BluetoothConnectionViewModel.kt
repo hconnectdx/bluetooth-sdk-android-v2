@@ -347,7 +347,7 @@ class BluetoothConnectionViewModel : ViewModel() {
                         it.characteristics.forEach { c ->
                             if (c.uuid.toString() == "0000ffe1-0000-1000-8000-00805f9b34fb") {
                                 HCBle.getGattController(selDevice.address)
-                                    ?.setTargetCharacteristicUUID(it.uuid.toString())
+                                    ?.setTargetReadCharacteristicUUID(it.uuid.toString())
                                 HCBle.getGattController(selDevice.address)
                                     ?.setCharacteristicNotification(true)
                             }

@@ -173,8 +173,8 @@ class MainActivity : AppCompatActivity() {
         btnTest4.setOnClickListener {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val response = SleepApiService().sendStartSleep()
-                    Log.d("MainActivity", "response: $response")
+//                    val response = SleepApiService().sendStartSleep()
+//                    Log.d("MainActivity", "response: $response")
                 } catch (e: Exception) {
                     Log.e("MainActivity", "error: $e")
                 }
@@ -184,8 +184,8 @@ class MainActivity : AppCompatActivity() {
         btnTest5.setOnClickListener {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val response = SleepApiService().sendEndSleep()
-                    Log.d("MainActivity", "response: $response")
+//                    val response = SleepApiService().sendEndSleep()
+//                    Log.d("MainActivity", "response: $response")
                 } catch (e: Exception) {
                     Log.e("MainActivity", "error: $e")
                 }

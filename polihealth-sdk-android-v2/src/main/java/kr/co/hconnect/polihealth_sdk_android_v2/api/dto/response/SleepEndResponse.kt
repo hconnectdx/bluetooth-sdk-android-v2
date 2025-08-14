@@ -25,6 +25,7 @@ fun String.toSleepEndResponse(): SleepEndResponse {
         val dataObject: JSONObject? = jsonObject.getJSONObject("data")
         dataObject?.let {
             val sleepQuality = it.getInt("sleepQuality")
+//            val sleepQuality = 80 // 더미 테스트
             val data = SleepEndResponse.Data(sleepQuality = sleepQuality)
             return SleepEndResponse(data).apply {
                 this.retCd = retCd

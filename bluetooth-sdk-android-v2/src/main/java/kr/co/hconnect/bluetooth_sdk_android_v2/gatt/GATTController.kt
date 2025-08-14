@@ -15,7 +15,8 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
 
     private lateinit var gattServiceList: List<BluetoothGattService>
     lateinit var targetService: BluetoothGattService
-    lateinit var targetCharacteristic: BluetoothGattCharacteristic
+    lateinit var targetReadCharacteristic: BluetoothGattCharacteristic
+    lateinit var targetWriteCharacteristic: BluetoothGattCharacteristic
 
     fun disconnect() {
         bluetoothGatt.disconnect()
@@ -41,7 +42,7 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
 
     fun setGattServiceList(gattServiceList: List<BluetoothGattService>) {
         if (gattServiceList.isEmpty()) {
-            Logger.e("getGattServiceList(): gattServiceList is not initialized")
+            Logger.e("setGattServiceList(): gattServiceList is empty")
             return
         }
         this.gattServiceList = gattServiceList
@@ -64,7 +65,6 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
 
             val findService = gattServiceList.find { it.uuid.toString() == uuid }
 
-
             Logger.d("내가 선택한 서비스 uuid: ${uuid}")
             gattServiceList.forEach { service ->
                 Logger.d("2Registered Service UUID: ${service.uuid}")
@@ -72,7 +72,6 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
                     Logger.d("2Registered Characteristic UUID: ${characteristic.uuid}")
                 }
             }
-
 
             if (findService == null) {
                 Logger.e("setTargetServiceUUID: Service not found")
@@ -85,63 +84,102 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
         } catch (e: Exception) {
             Logger.e("setTargetServiceUUID: ${e.message}")
         }
-
     }
 
-    fun setTargetCharacteristicUUID(characteristicUUID: String) {
+    fun setTargetReadCharacteristicUUID(characteristicUUID: String) {
         try {
             if (::targetService.isInitialized.not()) {
-                Logger.e("setTargetCharacteristicUUID: Service is not initialized")
+                Logger.e("setTargetReadCharacteristicUUID: Service is not initialized")
                 return
             }
-            targetService.characteristics.find { it.uuid.toString() == characteristicUUID }?.let {
-                targetCharacteristic = it
-                Logger.d("setTargetCharacteristicUUID: $characteristicUUID")
+
+            val findCharacteristic = targetService.characteristics.find {
+                it.uuid.toString() == characteristicUUID
             }
 
+            if (findCharacteristic == null) {
+                Logger.e("setTargetReadCharacteristicUUID: Read Characteristic not found - $characteristicUUID")
+                return
+            }
+
+            targetReadCharacteristic = findCharacteristic
+            Logger.d("setTargetReadCharacteristicUUID: $characteristicUUID")
+
         } catch (e: Exception) {
-            Logger.e("setTargetCharacteristicUUID: ${e.message}")
+            Logger.e("setTargetReadCharacteristicUUID: ${e.message}")
+        }
+    }
+
+    fun setTargetWriteCharacteristicUUID(characteristicUUID: String) {
+        try {
+            if (::targetService.isInitialized.not()) {
+                Logger.e("setTargetWriteCharacteristicUUID: Service is not initialized")
+                return
+            }
+
+            val findCharacteristic = targetService.characteristics.find {
+                it.uuid.toString() == characteristicUUID
+            }
+
+            if (findCharacteristic == null) {
+                Logger.e("setTargetWriteCharacteristicUUID: Write Characteristic not found - $characteristicUUID")
+                return
+            }
+
+            targetWriteCharacteristic = findCharacteristic
+            Logger.d("setTargetWriteCharacteristicUUID: $characteristicUUID")
+
+        } catch (e: Exception) {
+            Logger.e("setTargetWriteCharacteristicUUID: ${e.message}")
         }
     }
 
     fun readCharacteristic() {
-        if (::targetCharacteristic.isInitialized.not()) {
-            Logger.e("selTargetCharacteristic is not initialized")
+        if (::targetReadCharacteristic.isInitialized.not()) {
+            Logger.e("targetReadCharacteristic is not initialized")
             return
         }
-        bluetoothGatt.readCharacteristic(targetCharacteristic)
-
+        bluetoothGatt.readCharacteristic(targetReadCharacteristic)
     }
 
     fun writeCharacteristic(data: ByteArray) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // API 33 이상
+        if (::targetWriteCharacteristic.isInitialized.not()) {
+            Logger.e("targetWriteCharacteristic is not initialized")
+            return
+        }
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // API 33 이상
             bluetoothGatt.writeCharacteristic(
-                targetCharacteristic,
+                targetWriteCharacteristic,
                 data,
                 BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
             )
         } else { // API 32 이하
-            targetCharacteristic.value = data
-            bluetoothGatt.writeCharacteristic(targetCharacteristic)
+            targetWriteCharacteristic.value = data
+            bluetoothGatt.writeCharacteristic(targetWriteCharacteristic)
         }
     }
 
     fun setCharacteristicNotification(isEnable: Boolean, isIndicate: Boolean = false) {
         if (::gattServiceList.isInitialized.not()) {
-            Logger.e("gattServiceList list is empty")
+            Logger.e("gattServiceList is not initialized")
             return
         }
         if (::targetService.isInitialized.not()) {
             Logger.e("targetService is not initialized")
             return
         }
+        if (::targetReadCharacteristic.isInitialized.not()) {
+            Logger.e("targetReadCharacteristic is not initialized")
+            return
+        }
+
         // 알림 또는 인디케이션 설정
-        bluetoothGatt.setCharacteristicNotification(targetCharacteristic, isEnable)
+        bluetoothGatt.setCharacteristicNotification(targetReadCharacteristic, isEnable)
 
         // CCCD (Client Characteristic Configuration Descriptor) UUID
         val descriptor =
-            targetCharacteristic.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"))
+            targetReadCharacteristic.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"))
 
         // Descriptor가 존재하는지 체크
         descriptor?.let {
@@ -158,17 +196,16 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
                 descriptor.value = value
                 bluetoothGatt.writeDescriptor(descriptor)
             }
-        } ?: Log.e("BluetoothGatt", "Descriptor not found for characteristic")
+        } ?: Logger.e("Descriptor not found for targetReadCharacteristic")
     }
 
-
     fun readCharacteristicNotification() {
-        if (::targetCharacteristic.isInitialized.not()) {
-            Logger.e("targetCharacteristic is not initialized")
+        if (::targetReadCharacteristic.isInitialized.not()) {
+            Logger.e("targetReadCharacteristic is not initialized")
             return
         }
         val descriptor =
-            targetCharacteristic.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"))
+            targetReadCharacteristic.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"))
         bluetoothGatt.readDescriptor(descriptor)
     }
 }

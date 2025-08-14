@@ -51,6 +51,9 @@ object PoliBLE {
     private var p2IsFirstPacket: Boolean = true
     private var prevByte: Byte = PROTOCOL_02_RESET_ORDER
 
+    //
+    private lateinit var onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
+
     // 레거시 변수들 (사용하지 않음)
     @Deprecated("더 이상 사용하지 않음")
     private var expectedByte: Byte = 0x00
@@ -118,6 +121,7 @@ object PoliBLE {
         autoConnect: Boolean
     ) {
         Log.d(TAG, "디바이스 연결 시작: ${device.address}")
+        this.onReceive = onReceive
 
         HCBle.connectToDevice(
             isAutoConnect = autoConnect,
@@ -181,6 +185,10 @@ object PoliBLE {
         HCBle.disconnectAll()
     }
 
+    fun getBondedDevices(): List<BluetoothDevice> {
+        return HCBle.getBondedDevices()
+    }
+
     // =============================================================================
     // PROTOCOL DATA PROCESSING
     // =============================================================================
@@ -207,8 +215,20 @@ object PoliBLE {
             0x01.toByte() -> handleProtocol01(byteArray, context, onReceive)
             0x02.toByte() -> handleProtocol02(byteArray, dataOrder, context, onReceive)
             0x03.toByte() -> handleProtocol03(byteArray, onReceive)
-            0x04.toByte() -> handleProtocol04(context, onReceive)
-            0x05.toByte() -> handleProtocol05(context, onReceive)
+            0x04.toByte() -> {
+                if (context != null)
+                    handleProtocol04(context, onReceive)
+                else
+                    Log.e(TAG, "SharedPreference를 사용하기 위한 Context가 없습니다.")
+            }
+
+            0x05.toByte() -> {
+                if (context != null)
+                    handleProtocol05(context, onReceive)
+                else
+                    Log.e(TAG, "SharedPreference를 사용하기 위한 Context가 없습니다.")
+            }
+
             0x06.toByte() -> handleProtocol06(byteArray, context, onReceive)
             0x07.toByte() -> handleProtocol07(byteArray, context, onReceive)
             0x08.toByte() -> handleProtocol08(byteArray, context, onReceive)
@@ -380,13 +400,13 @@ object PoliBLE {
      * Protocol 04 처리 (수면 시작)
      */
     private fun handleProtocol04(
-        context: Context?,
+        context: Context,
         onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
     ) {
         Log.d(TAG, "Protocol 04 처리 - 수면 시작")
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val response = SleepApiService().sendStartSleep()
+                val response = SleepApiService().sendStartSleep(context)
                 val type = if (response.retCd == "0") {
                     ProtocolType.PROTOCOL_4_SLEEP_START
                 } else {
@@ -404,13 +424,13 @@ object PoliBLE {
      * Protocol 05 처리 (수면 종료)
      */
     private fun handleProtocol05(
-        context: Context?,
+        context: Context,
         onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
     ) {
         Log.d(TAG, "Protocol 05 처리 - 수면 종료")
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val response = SleepApiService().sendEndSleep()
+                val response = SleepApiService().sendEndSleep(context)
                 val type = if (response.retCd == "0") {
                     ProtocolType.PROTOCOL_5_SLEEP_END
                 } else {
@@ -523,6 +543,10 @@ object PoliBLE {
         }
     }
 
+    private fun handleStopBandProtocol(deviceAddress: String) {
+        writeCharacteristic(deviceAddress, "POLICE_STOP".toByteArray())
+    }
+
     /**
      * 알 수 없는 프로토콜 로깅
      */
@@ -581,11 +605,35 @@ object PoliBLE {
     }
 
     /**
-     * 대상 특성 UUID 설정
+     * Read 특성 UUID 설정 (알림 수신용)
+     * 데이터를 수신받을 특성을 설정합니다.
      */
+    fun setTargetReadCharacteristicUUID(deviceAddress: String, characteristicUUID: String) {
+        Log.d(TAG, "Read 특성 UUID 설정: $characteristicUUID")
+        HCBle.setTargetReadCharacteristicUUID(deviceAddress, characteristicUUID)
+    }
+
+    /**
+     * Write 특성 UUID 설정 (데이터 전송용)
+     * 디바이스로 명령을 전송할 특성을 설정합니다.
+     */
+    fun setTargetWriteCharacteristicUUID(deviceAddress: String, characteristicUUID: String) {
+        Log.d(TAG, "Write 특성 UUID 설정: $characteristicUUID")
+        HCBle.setTargetWriteCharacteristicUUID(deviceAddress, characteristicUUID)
+    }
+
+    /**
+     * 레거시 함수 - 하위 호환성을 위해 유지
+     * @deprecated setTargetReadCharacteristicUUID 또는 setTargetWriteCharacteristicUUID 사용 권장
+     */
+    @Deprecated(
+        message = "Read/Write를 명확히 구분해서 사용하세요",
+        replaceWith = ReplaceWith("setTargetReadCharacteristicUUID(deviceAddress, characteristicUUID)")
+    )
     fun setTargetCharacteristicUUID(deviceAddress: String, characteristicUUID: String) {
-        Log.d(TAG, "특성 UUID 설정: $characteristicUUID")
-        HCBle.setTargetCharacteristicUUID(deviceAddress, characteristicUUID)
+        Log.w(TAG, "⚠️ Deprecated: setTargetCharacteristicUUID 사용됨. Read/Write 구분 사용 권장")
+        // 기본적으로 Read Characteristic으로 설정 (하위 호환성)
+        setTargetReadCharacteristicUUID(deviceAddress, characteristicUUID)
     }
 
     // =============================================================================
@@ -593,7 +641,7 @@ object PoliBLE {
     // =============================================================================
 
     /**
-     * 특성 읽기
+     * 특성 읽기 (Read Characteristic 사용)
      */
     fun readCharacteristic(deviceAddress: String) {
         Log.d(TAG, "특성 읽기: $deviceAddress")
@@ -601,7 +649,7 @@ object PoliBLE {
     }
 
     /**
-     * 특성 쓰기
+     * 특성 쓰기 (Write Characteristic 사용)
      */
     fun writeCharacteristic(deviceAddress: String, data: ByteArray) {
         Log.d(TAG, "특성 쓰기: $deviceAddress, 데이터: ${data.joinToString(" ") { "0x%02X".format(it) }}")
@@ -609,7 +657,8 @@ object PoliBLE {
     }
 
     /**
-     * 특성 알림 설정
+     * 특성 알림 설정 (Read Characteristic 사용)
+     * 데이터 수신을 위한 알림을 활성화/비활성화합니다.
      */
     fun setCharacteristicNotification(
         deviceAddress: String,
@@ -620,22 +669,19 @@ object PoliBLE {
         HCBle.setCharacteristicNotification(deviceAddress, isEnable, isIndicate)
     }
 
-    // =============================================================================
-    // DEVICE MANAGEMENT
-    // =============================================================================
-
     /**
-     * 페어링된 디바이스 목록 조회
+     * Read Characteristic 조회
      */
-    fun getBondedDevices(): List<BluetoothDevice> {
-        return HCBle.getBondedDevices()
+    fun getReadCharacteristic(deviceAddress: String): BluetoothGattCharacteristic? {
+        return HCBle.getSelReadCharacteristic(deviceAddress)
     }
 
     /**
-     * 디바이스 연결 해제 (별칭)
+     * Write Characteristic 조회
      */
-    @Deprecated("disconnectDevice 사용 권장")
-    fun deconnect(address: String) {
-        disconnectDevice(address)
+    fun getWriteCharacteristic(deviceAddress: String): BluetoothGattCharacteristic? {
+        return HCBle.getSelWriteCharacteristic(deviceAddress)
     }
+
+
 }
