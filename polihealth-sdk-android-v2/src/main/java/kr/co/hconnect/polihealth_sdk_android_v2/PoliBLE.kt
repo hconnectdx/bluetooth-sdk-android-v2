@@ -252,7 +252,7 @@ object PoliBLE {
                 // 패킷 처리
                 handleDataPacket(dataOrder, onReceive)
                 // 시작 조건 검증
-                checkStartCondition(dataOrder, onReceive)
+                checkStartCondition(onReceive)
 
                 // 데이터 추가 및 완료 처리
                 prevByte = dataOrder
