@@ -48,8 +48,8 @@ object PoliBLE {
 
     // Protocol 02 순서 추적 변수들
     private var p2ExpectedOrder: Byte = PROTOCOL_02_RESET_ORDER
-    private var p2IsFirstPacket: Boolean = true
     private var prevByte: Byte = PROTOCOL_02_RESET_ORDER
+    private var p2IsFirstPacket: Boolean = true
 
     //
     private lateinit var onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
@@ -269,10 +269,10 @@ object PoliBLE {
 
         DailyProtocol02API.apply {
             CoroutineScope(Dispatchers.IO).launch {
-                // 패킷 처리
-                handleDataPacket(dataOrder, onReceive)
                 // 시작 조건 검증
                 checkStartCondition(onReceive)
+                // 패킷 처리
+                handleDataPacket(dataOrder, onReceive)
 
                 // 데이터 추가 및 완료 처리
                 prevByte = dataOrder
