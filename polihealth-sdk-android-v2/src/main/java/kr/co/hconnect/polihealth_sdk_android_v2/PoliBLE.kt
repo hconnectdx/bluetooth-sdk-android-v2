@@ -51,7 +51,7 @@ object PoliBLE {
     private var prevByte: Byte = PROTOCOL_02_RESET_ORDER
     private var p2IsFirstPacket: Boolean = true
 
-    //
+    // 수면 강제종료용 콜백함수
     private lateinit var onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
 
     // 레거시 변수들 (사용하지 않음)
@@ -683,5 +683,18 @@ object PoliBLE {
         return HCBle.getSelWriteCharacteristic(deviceAddress)
     }
 
-
+    /**
+     * 수면 강제 종료 / stop 신호 강제 생성
+     */
+    fun stopSleepForce(context: Context, deviceAddress: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val response = SleepApiService().sendEndSleep(context)
+            val type = if (response.retCd == "0") {
+                ProtocolType.PROTOCOL_5_SLEEP_END
+            } else {
+                ProtocolType.PROTOCOL_5_SLEEP_END_ERROR
+            }
+            onReceive(type, null)
+        }
+    }
 }

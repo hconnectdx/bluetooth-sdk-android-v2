@@ -44,16 +44,17 @@ object DailyServiceToApp {
                     TAG,
                     "sendProtocol2ToApp: ${DailyProtocol02API.byteArray.size}"
                 )
-                if (byteArray.size == 192_000) {
-                    val response =
-                        DailyApiService().sendProtocol02(context)
-                    onReceive.invoke(ProtocolType.PROTOCOL_2, response)
-                } else {
-                    onReceive.invoke(
-                        ProtocolType.PROTOCOL_2_ERROR_LACK_OF_DATA,
-                        null
-                    )
-                }
+                val response =
+                    DailyApiService().sendProtocol02(context)
+                onReceive.invoke(ProtocolType.PROTOCOL_2, response)
+//                if (byteArray.size == 192_000) {
+//
+//                } else {
+//                    onReceive.invoke(
+//                        ProtocolType.PROTOCOL_2_ERROR_LACK_OF_DATA,
+//                        null
+//                    )
+//                }
             } catch (e: Exception) {
                 Log.e(TAG, "sendProtocol02: ${e.message}")
                 onReceive.invoke(ProtocolType.PROTOCOL_2_ERROR, null)
