@@ -59,7 +59,6 @@ object BleSdkManager {
     private fun doScan(onScanResult: (ScanResult) -> Unit, onScanStop: () -> Unit) {
 
         HCBle.scanLeDevice(
-            scanId = "",
             onScanResult = { scanResult: ScanResult ->
                 onScanResult.invoke(scanResult)
             },
@@ -73,6 +72,6 @@ object BleSdkManager {
      * Stop BLE scan
      */
     fun stopBleScan(sessionId: String) {
-        HCBle.scanStop()
+//        HCBle.scanStop()
     }
 }

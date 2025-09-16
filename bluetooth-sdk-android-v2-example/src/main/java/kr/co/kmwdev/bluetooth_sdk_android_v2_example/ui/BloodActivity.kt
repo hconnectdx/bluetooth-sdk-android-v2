@@ -140,7 +140,7 @@ class BloodActivity : AppCompatActivity() {
                         HCBle.connectToDevice(
                             sessionId = scanId,
                             onConnState = {
-                                HCBle.scanStop()
+                                HCBle.stopScanSession(scanId)
                             },
                             isPrintReceiveLog = false,
                             device = device,

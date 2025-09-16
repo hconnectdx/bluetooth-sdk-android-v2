@@ -35,7 +35,7 @@ class BluetoothConnectionViewModel : ViewModel() {
     lateinit var bondedAdapter: BluetoothBondedListAdapter
 
     private fun updateScanningStatus(isScanning: Boolean) {
-        this.isScanning.value = isScanning
+        this.isScanning.postValue(isScanning)
     }
 
     fun updateScanningResultsState(scanResultModel: ScanResultModel) {

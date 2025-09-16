@@ -95,10 +95,10 @@ object HCBle {
      * @return 생성된 스캔 세션 ID
      */
     fun scanLeDevice(
+        scanId: String = "general",
         scanPeriod: Long = DEFAULT_SCAN_PERIOD,
         onScanResult: (ScanResult) -> Unit,
-        onScanStop: () -> Unit,
-        scanId: String
+        onScanStop: () -> Unit
     ): String {
 
 
@@ -457,6 +457,7 @@ object HCBle {
         try {
             // GATT 연결 생성
             val gatt = getGattConnection(
+                sessionId,
                 device,
                 // 연결 상태 콜백 래핑 강화
                 { state ->
@@ -538,6 +539,8 @@ object HCBle {
     }
 
     private fun getGattConnection(
+
+        sessionId: String,
         device: BluetoothDevice,
         onConnState: ((state: Int) -> Unit)? = null,
         onGattServiceState: ((state: Int, List<BluetoothGattService>) -> Unit)? = null,
@@ -548,7 +551,7 @@ object HCBle {
         autoConnect: Boolean = false,
         isPrintReceiveLog: Boolean = false
     ): BluetoothGatt {
-
+        stopScanSession(sessionId = sessionId)
         return device.connectGatt(appContext, autoConnect, object : BluetoothGattCallback() {
 
             /**

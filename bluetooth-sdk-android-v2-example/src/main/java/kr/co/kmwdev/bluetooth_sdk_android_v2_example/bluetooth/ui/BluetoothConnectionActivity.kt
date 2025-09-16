@@ -146,7 +146,7 @@ class BluetoothConnectionActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        viewModel.scanStop()
+//        viewModel.scanStop()
         viewModel.bondedDevices.value?.clear()
         viewModel.scanResults.value?.clear()
     }
