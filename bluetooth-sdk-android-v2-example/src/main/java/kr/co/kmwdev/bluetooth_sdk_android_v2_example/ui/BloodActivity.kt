@@ -43,8 +43,9 @@ class BloodActivity : AppCompatActivity() {
         setBloodPressureListener()
         findViewById<Button>(R.id.btnStartBloodTick).setOnClickListener {
             Log.d("BloodActivity", "혈액투석 측정 프로세스를 시작합니다")
+            val scanId = "투석기"
             HCBle.scanLeDevice(
-                scanId = "투석기",
+                scanId = scanId,
                 scanPeriod = 300_000,
                 onScanStop = {
 
@@ -57,6 +58,7 @@ class BloodActivity : AppCompatActivity() {
 
                     if (!device.name.isNullOrEmpty() && device.name.contains("DESKTOP-")) {
                         HCBle.connectToDevice(
+                            sessionId = scanId,
                             device = device,
                             onGattServiceState = { state, serviceList ->
 
@@ -124,8 +126,9 @@ class BloodActivity : AppCompatActivity() {
     private fun setBloodPressureListener() {
         findViewById<Button>(R.id.btnStartBloodPressure).setOnClickListener {
             Log.d("BloodActivity", "혈압 측정 프로세스를 시작합니다")
+            val scanId = "혈압계"
             HCBle.scanLeDevice(
-                scanId = "혈압계",
+                scanId = scanId,
                 scanPeriod = 300_000,
                 onScanStop = {
 
@@ -135,6 +138,7 @@ class BloodActivity : AppCompatActivity() {
 
                     if (!device.name.isNullOrEmpty() && device.name.contains("A&D")) {
                         HCBle.connectToDevice(
+                            sessionId = scanId,
                             onConnState = {
                                 HCBle.scanStop()
                             },

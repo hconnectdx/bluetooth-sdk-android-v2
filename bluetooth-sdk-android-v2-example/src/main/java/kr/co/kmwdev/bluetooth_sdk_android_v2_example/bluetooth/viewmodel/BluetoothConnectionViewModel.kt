@@ -251,13 +251,14 @@ class BluetoothConnectionViewModel : ViewModel() {
         }
     }
 
-    fun scanStop() {
-        BleSdkManager.stopBleScan()
+    fun scanStop(sessionId: String) {
+        BleSdkManager.stopBleScan(sessionId)
     }
 
     @SuppressLint("MissingPermission")
     fun connect(selDevice: BluetoothDevice) {
         HCBle.connectToDevice(
+            sessionId = "",
             selDevice,
             onReceive = {
                 Logger.d("Received data: $it")

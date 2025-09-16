@@ -261,8 +261,8 @@ object HCBle {
      * 레거시 scanStop 메소드 (모든 스캔 중지)
      */
     @Deprecated("Use stopAllScans() or stopScanSession(sessionId) instead")
-    fun scanStop() {
-        stopAllScans()
+    fun scanStop(sessionId: String) {
+        stopScanSession(sessionId = sessionId)
     }
 
     fun isConnect(device: BluetoothDevice): Boolean {
@@ -321,6 +321,7 @@ object HCBle {
      * @param onReceive
      */
     fun connectToDevice(
+        sessionId: String,
         device: BluetoothDevice,
         onConnState: ((state: Int) -> Unit)? = null,
         onBondState: ((state: Int) -> Unit)? = null,
@@ -371,6 +372,7 @@ object HCBle {
 
         // 직접 연결 시도
         connectToDeviceInternal(
+            sessionId,
             device, onConnState, onBondState, onGattServiceState,
             onReadCharacteristic, onWriteCharacteristic, onSubscriptionState,
             onReceive, useBondingChangeState, isAutoConnect, isPrintReceiveLog,
@@ -381,6 +383,7 @@ object HCBle {
      * 실제 연결 로직 분리
      */
     private fun connectToDeviceInternal(
+        sessionId: String,
         device: BluetoothDevice,
         onConnState: ((state: Int) -> Unit)? = null,
         onBondState: ((state: Int) -> Unit)? = null,
@@ -468,6 +471,7 @@ object HCBle {
                         BLEState.STATE_CONNECTED -> {
                             connectingDevices.remove(deviceAddress)
                             Logger.d("Connection completed for $deviceAddress")
+                            stopScanSession(sessionId = sessionId)
                         }
 
                         BLEState.STATE_DISCONNECTED -> {
