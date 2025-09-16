@@ -29,6 +29,8 @@ import kr.co.hconnect.bluetooth_sdk_android_v2.gatt.GATTController
 import kr.co.hconnect.bluetooth_sdk_android_v2.gatt.GATTState
 import kr.co.hconnect.bluetooth_sdk_android_v2.scan.BleScanHandler
 import kr.co.hconnect.bluetooth_sdk_android_v2.util.Logger
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 @SuppressLint("MissingPermission")
 object HCBle {
@@ -40,16 +42,34 @@ object HCBle {
     private lateinit var bluetoothAdapter: BluetoothAdapter
     private lateinit var bluetoothLeScanner: BluetoothLeScanner
 
-    private var scanning = false
-    private var scanHandler: BleScanHandler? = null
-    private var mapBLEGatt = mutableMapOf<String, GATTController>()
+    // 스캔 세션 관리
+    data class ScanSession(
+        val id: String,
+        val scanHandler: BleScanHandler,
+        val scanJob: Job,
+        val onScanResult: (ScanResult) -> Unit,
+        val onScanStop: () -> Unit,
+        val scanPeriod: Long,
+        val startTime: Long = System.currentTimeMillis()
+    )
 
-    // Stops scanning after 10 seconds.
-    private val SCAN_PERIOD: Long = 10000
-    private var scanJob: Job? = null
+    private val activeScanSessions = ConcurrentHashMap<String, ScanSession>()
+
+    private var mapBLEGatt = mutableMapOf<String, GATTController>()
+    private var bondStateReceivers = mutableMapOf<String, BroadcastReceiver>()
+
+    // 연결 상태 관리
+    private var connectingDevices = mutableSetOf<String>()
+    private var disconnectingDevices = mutableSetOf<String>()
+
+    // 스캔된 디바이스 중복 방지 (전역 관리)
+    private var recentlyFoundDevices = mutableMapOf<String, Long>()
+    private val DEVICE_FOUND_COOLDOWN = 2000L // 2초 쿨다운
+
+    private val DEFAULT_SCAN_PERIOD: Long = 10000
 
     /**
-     * TODO: BLE를 초기화합니다.
+     * BLE를 초기화합니다.
      * @param context
      */
     fun init(context: Context) {
@@ -67,55 +87,182 @@ object HCBle {
     }
 
     /**
-     * TODO: BLE 스캔을 시작합니다
-     * @param onScanResult
+     * BLE 스캔을 시작합니다 (멀티 스캔 지원)
+     * @param scanPeriod 스캔 지속 시간
+     * @param onScanResult 스캔 결과 콜백
+     * @param onScanStop 스캔 종료 콜백
+     * @param scanId 스캔 세션 ID (선택사항, null이면 자동 생성)
+     * @return 생성된 스캔 세션 ID
      */
     fun scanLeDevice(
-        scanPeriod: Long = SCAN_PERIOD,
+        scanPeriod: Long = DEFAULT_SCAN_PERIOD,
         onScanResult: (ScanResult) -> Unit,
-        onScanStop: () -> Unit
-    ) {
-        scanHandler = BleScanHandler(onScanResult)
+        onScanStop: () -> Unit,
+        scanId: String
+    ): String {
 
-        if (!scanning) {
-            scanJob = CoroutineScope(Dispatchers.IO).launch {
-                scanning = true
-                bluetoothLeScanner.startScan(scanHandler?.leScanCallback)
 
-                try {
-                    withTimeout(scanPeriod) {
-                        suspendCancellableCoroutine<Unit> { continuation ->
-                            continuation.invokeOnCancellation {
-                                Log.d(TAG, "scanLeDevice: Canceled")
-                                scanning = false
-                                bluetoothLeScanner.stopScan(scanHandler?.leScanCallback)
-                                onScanStop()
-                                scanJob?.cancel()
-                            }
+        // 이미 같은 ID의 스캔이 실행 중이면 중지하고 새로 시작
+        if (activeScanSessions.containsKey(scanId)) {
+            Logger.w("Scan session $scanId already exists, stopping it first")
+            stopScanSession(scanId)
+        }
+
+        // 스캔 결과 중복 필터링 (전역 중복 방지)
+        val filteredOnScanResult: (ScanResult) -> Unit = { result ->
+            val address = result.device.address
+            val currentTime = System.currentTimeMillis()
+            val lastFoundTime = recentlyFoundDevices[address] ?: 0L
+
+            if (currentTime - lastFoundTime > DEVICE_FOUND_COOLDOWN) {
+                recentlyFoundDevices[address] = currentTime
+                onScanResult(result)
+            }
+        }
+
+        val scanHandler = BleScanHandler(filteredOnScanResult)
+
+        val scanJob = CoroutineScope(Dispatchers.IO).launch {
+            try {
+                Logger.d("Starting scan session: $scanId for ${scanPeriod}ms")
+                bluetoothLeScanner.startScan(scanHandler.leScanCallback)
+
+                withTimeout(scanPeriod) {
+                    suspendCancellableCoroutine<Unit> { continuation ->
+                        continuation.invokeOnCancellation {
+                            Logger.d("Scan session $scanId: Canceled")
+                            bluetoothLeScanner.stopScan(scanHandler.leScanCallback)
+                            cleanupScanSession(scanId)
+                            onScanStop()
                         }
                     }
-                } finally {
-                    scanStop()
                 }
+            } catch (e: Exception) {
+                Logger.e("Scan session $scanId error: ${e.message}")
+            } finally {
+                // 스캔 종료 처리
+                try {
+                    bluetoothLeScanner.stopScan(scanHandler.leScanCallback)
+                } catch (e: Exception) {
+                    Logger.e("Error stopping scan for session $scanId: ${e.message}")
+                }
+
+                cleanupScanSession(scanId)
+                onScanStop()
+                Logger.d("Scan session $scanId completed")
             }
+        }
+
+        // 스캔 세션 등록
+        val scanSession = ScanSession(
+            id = scanId,
+            scanHandler = scanHandler,
+            scanJob = scanJob,
+            onScanResult = filteredOnScanResult,
+            onScanStop = onScanStop,
+            scanPeriod = scanPeriod
+        )
+
+        activeScanSessions[scanId] = scanSession
+
+        Logger.d("Scan session $scanId started. Active sessions: ${activeScanSessions.size}")
+        return scanId
+    }
+
+    /**
+     * 특정 스캔 세션을 중지합니다.
+     * @param sessionId 중지할 스캔 세션 ID
+     */
+    fun stopScanSession(sessionId: String): Boolean {
+        val session = activeScanSessions[sessionId]
+        if (session == null) {
+            Logger.w("Scan session $sessionId not found")
+            return false
+        }
+
+        try {
+            Logger.d("Stopping scan session: $sessionId")
+
+            // 스캔 중지
+            bluetoothLeScanner.stopScan(session.scanHandler.leScanCallback)
+
+            // Job 취소
+            session.scanJob.cancel()
+
+            // 정리
+            cleanupScanSession(sessionId)
+
+            // 콜백 호출
+            session.onScanStop()
+
+            Logger.d("Scan session $sessionId stopped successfully")
+            return true
+
+        } catch (e: Exception) {
+            Logger.e("Error stopping scan session $sessionId: ${e.message}")
+            cleanupScanSession(sessionId)
+            return false
         }
     }
 
     /**
-     * TODO: 스캔을 중지합니다.
+     * 모든 스캔 세션을 중지합니다.
      */
-    fun scanStop() {
-        if (scanning) {
-            scanning = false
-            bluetoothLeScanner.stopScan(scanHandler?.leScanCallback)
-            scanJob?.cancel()
-            scanHandler = null // 핸들러 참조 해제
-            Logger.d("scanStop: Stop scanning")
+    fun stopAllScans() {
+        Logger.d("Stopping all scan sessions. Count: ${activeScanSessions.size}")
+
+        val sessionIds = activeScanSessions.keys.toList()
+        sessionIds.forEach { sessionId ->
+            stopScanSession(sessionId)
         }
+
+        // 전역 중복 방지 맵도 정리
+        recentlyFoundDevices.clear()
+
+        Logger.d("All scan sessions stopped")
     }
 
-    fun isScanning(): Boolean {
-        return scanning
+    /**
+     * 스캔 세션 정리
+     */
+    private fun cleanupScanSession(sessionId: String) {
+        activeScanSessions.remove(sessionId)
+        Logger.d("Cleaned up scan session: $sessionId. Remaining: ${activeScanSessions.size}")
+    }
+
+    /**
+     * 스캔 세션 ID 자동 생성
+     */
+    private fun generateScanSessionId(): String {
+        return "scan_${UUID.randomUUID().toString().substring(0, 8)}"
+    }
+
+    /**
+     * 현재 활성화된 스캔 세션 수 반환
+     */
+    fun getActiveScanCount(): Int = activeScanSessions.size
+
+    /**
+     * 활성화된 스캔 세션 정보 반환
+     */
+    fun getActiveScanSessions(): List<String> = activeScanSessions.keys.toList()
+
+    /**
+     * 특정 스캔 세션이 활성화되어 있는지 확인
+     */
+    fun isScanSessionActive(sessionId: String): Boolean = activeScanSessions.containsKey(sessionId)
+
+    /**
+     * 전체 스캔 상태 확인 (하나라도 실행 중이면 true)
+     */
+    fun isScanning(): Boolean = activeScanSessions.isNotEmpty()
+
+    /**
+     * 레거시 scanStop 메소드 (모든 스캔 중지)
+     */
+    @Deprecated("Use stopAllScans() or stopScanSession(sessionId) instead")
+    fun scanStop() {
+        stopAllScans()
     }
 
     fun isConnect(device: BluetoothDevice): Boolean {
@@ -126,10 +273,7 @@ object HCBle {
     }
 
     /**
-     * TODO 다르게 구현한 버전
-     *
-     * @param device
-     * @return
+     * 다르게 구현한 버전
      */
     fun isConnected(device: BluetoothDevice): Boolean {
         val bluetoothManager =
@@ -140,30 +284,35 @@ object HCBle {
         ) == BluetoothProfile.STATE_CONNECTED
     }
 
-    fun getSelService(deviceAddress: String): BluetoothGattService? {
-        val gattController: GATTController = mapBLEGatt[deviceAddress] ?: return null
-        if (mapBLEGatt[deviceAddress] == null) {
-            Logger.e("gattController is not initialized")
-            return null
-        }
-
-        return gattController.targetService
-    }
-
-    // 🔧 수정: targetCharacteristic → targetReadCharacteristic
-    fun getSelReadCharacteristic(deviceAddress: String): BluetoothGattCharacteristic? {
-        val gattController: GATTController = mapBLEGatt[deviceAddress] ?: return null
-        return gattController.targetReadCharacteristic
-    }
-
-    // 🆕 추가: Write Characteristic 조회 함수
-    fun getSelWriteCharacteristic(deviceAddress: String): BluetoothGattCharacteristic? {
-        val gattController: GATTController = mapBLEGatt[deviceAddress] ?: return null
-        return gattController.targetWriteCharacteristic
+    /**
+     * 연결 중인지 확인하는 함수
+     */
+    fun isConnecting(deviceAddress: String): Boolean {
+        return connectingDevices.contains(deviceAddress)
     }
 
     /**
-     * TODO: 디바이스와 연결합니다.
+     * 연결 해제 중인지 확인하는 함수
+     */
+    fun isDisconnecting(deviceAddress: String): Boolean {
+        return disconnectingDevices.contains(deviceAddress)
+    }
+
+    /**
+     * 연결 상태 확인을 위한 개선된 함수
+     */
+    fun isDeviceActuallyConnected(deviceAddress: String): Boolean {
+        val device = bluetoothAdapter.getRemoteDevice(deviceAddress)
+        val systemConnected = isConnected(device)
+        val hasGattController = mapBLEGatt.containsKey(deviceAddress)
+
+        Logger.d("Connection check for $deviceAddress: system=$systemConnected, hasController=$hasGattController")
+
+        return systemConnected && hasGattController
+    }
+
+    /**
+     * 디바이스와 연결합니다.
      *
      * @param device
      * @param onConnState
@@ -182,45 +331,194 @@ object HCBle {
         onReceive: ((characteristic: BluetoothGattCharacteristic) -> Unit)? = null,
         useBondingChangeState: Boolean = true,
         isAutoConnect: Boolean = false,
+        isPrintReceiveLog: Boolean = false,
     ) {
+        val deviceAddress = device.address
 
+        // 연결 상태 체크 강화
+        if (isConnecting(deviceAddress)) {
+            Logger.e("Device is already connecting: ${device.name} ($deviceAddress)")
+            return
+        }
+
+        if (isDisconnecting(deviceAddress)) {
+            Logger.e("Device is disconnecting, please wait: ${device.name} ($deviceAddress)")
+            return
+        }
+
+        // 실제 연결 상태와 맵 상태 모두 체크
+        if (isConnected(device) && mapBLEGatt.containsKey(deviceAddress)) {
+            Logger.d("Device is already connected and has valid GATT controller: ${device.name}")
+            return
+        }
+
+        // 기존 GATT 정보가 있으면 강제로 완전 정리 후 재연결
+        if (mapBLEGatt.containsKey(deviceAddress) || isConnected(device)) {
+            Logger.w("Found existing connection for $deviceAddress, performing force disconnect...")
+
+            // 강제 연결 해제
+            forceDisconnect(deviceAddress)
+
+            // 연결 해제 완료 대기
+            Thread.sleep(500)
+
+            // 연결이 아직 남아있다면 추가 대기
+            if (isConnected(device)) {
+                Logger.w("Connection still exists, waiting longer...")
+                Thread.sleep(1000)
+            }
+        }
+
+        // 직접 연결 시도
+        connectToDeviceInternal(
+            device, onConnState, onBondState, onGattServiceState,
+            onReadCharacteristic, onWriteCharacteristic, onSubscriptionState,
+            onReceive, useBondingChangeState, isAutoConnect, isPrintReceiveLog,
+        )
+    }
+
+    /**
+     * 실제 연결 로직 분리
+     */
+    private fun connectToDeviceInternal(
+        device: BluetoothDevice,
+        onConnState: ((state: Int) -> Unit)? = null,
+        onBondState: ((state: Int) -> Unit)? = null,
+        onGattServiceState: ((state: Int, List<BluetoothGattService>) -> Unit)? = null,
+        onReadCharacteristic: ((status: Int) -> Unit)? = null,
+        onWriteCharacteristic: ((status: Int, characteristic: BluetoothGattCharacteristic?) -> Unit)? = null,
+        onSubscriptionState: ((state: Boolean) -> Unit)? = null,
+        onReceive: ((characteristic: BluetoothGattCharacteristic) -> Unit)? = null,
+        useBondingChangeState: Boolean = true,
+        isAutoConnect: Boolean = false,
+        isPrintReceiveLog: Boolean = false
+    ) {
+        val deviceAddress = device.address
+
+        // 중복 체크 강화
+        if (connectingDevices.contains(deviceAddress)) {
+            Logger.e("Device is already in connecting state: $deviceAddress")
+            return
+        }
+
+        // 연결 중 상태로 설정
+        connectingDevices.add(deviceAddress)
+        Logger.d("Added $deviceAddress to connecting devices")
+
+        // BroadcastReceiver 처리 개선
         val bondStateReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 val action = intent.action
                 if (BluetoothDevice.ACTION_BOND_STATE_CHANGED == action) {
-                    val bondState =
-                        intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.ERROR)
-
-                    onBondState?.invoke(bondState)
+                    val receivedDevice =
+                        intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+                    // 해당 디바이스의 본딩 상태 변경인지 확인
+                    if (receivedDevice?.address == deviceAddress) {
+                        val bondState = intent.getIntExtra(
+                            BluetoothDevice.EXTRA_BOND_STATE,
+                            BluetoothDevice.ERROR
+                        )
+                        onBondState?.invoke(bondState)
+                    }
                 }
             }
         }
 
         if (useBondingChangeState) {
-            appContext.registerReceiver(
-                bondStateReceiver,
-                IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
-            )
+            // 기존 리시버가 있다면 해제
+            bondStateReceivers[deviceAddress]?.let { oldReceiver ->
+                try {
+                    appContext.unregisterReceiver(oldReceiver)
+                    Logger.d("Unregistered old bondStateReceiver for $deviceAddress")
+                } catch (e: Exception) {
+                    Logger.e("Failed to unregister old bondStateReceiver: ${e.message}")
+                }
+            }
+
+            // 새 리시버 등록
+            try {
+                appContext.registerReceiver(
+                    bondStateReceiver,
+                    IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+                )
+                bondStateReceivers[deviceAddress] = bondStateReceiver
+                Logger.d("Registered new bondStateReceiver for $deviceAddress")
+            } catch (e: Exception) {
+                Logger.e("Failed to register bondStateReceiver: ${e.message}")
+                // 등록 실패 시 연결 중 상태 해제
+                connectingDevices.remove(deviceAddress)
+                return
+            }
         }
 
-        if (mapBLEGatt.containsKey(device.address)) {
-            Logger.e("Already connected to the device. device: ${device.name}")
-            Logger.e("디바이스를 지우고 재연결 합니다.")
-            mapBLEGatt.remove(device.address)
-        }
-
-        mapBLEGatt[device.address] = GATTController(
-            getGattConnection(
+        try {
+            // GATT 연결 생성
+            val gatt = getGattConnection(
                 device,
-                onConnState,
+                // 연결 상태 콜백 래핑 강화
+                { state ->
+                    Logger.d(
+                        "Connection state changed for $deviceAddress: ${
+                            BLEState.getStateString(
+                                state
+                            )
+                        }"
+                    )
+                    when (state) {
+                        BLEState.STATE_CONNECTED -> {
+                            connectingDevices.remove(deviceAddress)
+                            Logger.d("Connection completed for $deviceAddress")
+                        }
+
+                        BLEState.STATE_DISCONNECTED -> {
+                            connectingDevices.remove(deviceAddress)
+                            disconnectingDevices.remove(deviceAddress)
+                            Logger.d("Disconnection completed for $deviceAddress")
+                        }
+
+                        BLEState.STATE_CONNECTING -> {
+                            Logger.d("Connecting to $deviceAddress")
+                        }
+
+                        BLEState.STATE_DISCONNECTING -> {
+                            disconnectingDevices.add(deviceAddress)
+                            Logger.d("Disconnecting from $deviceAddress")
+                        }
+                    }
+                    onConnState?.invoke(state)
+                },
                 onGattServiceState,
                 onReadCharacteristic,
                 onWriteCharacteristic,
                 onSubscriptionState,
                 onReceive,
-                isAutoConnect
+                isAutoConnect,
+                isPrintReceiveLog
             )
-        )
+
+            // GATTController 생성 및 저장
+            mapBLEGatt[deviceAddress] = GATTController(gatt)
+            Logger.d("Created GATT controller for $deviceAddress")
+
+        } catch (e: Exception) {
+            Logger.e("Failed to create GATT connection for $deviceAddress: ${e.message}")
+
+            // 실패 시 정리
+            connectingDevices.remove(deviceAddress)
+
+            // BroadcastReceiver 정리
+            if (useBondingChangeState) {
+                bondStateReceivers[deviceAddress]?.let { receiver ->
+                    try {
+                        appContext.unregisterReceiver(receiver)
+                        bondStateReceivers.remove(deviceAddress)
+                    } catch (ex: Exception) {
+                        Logger.e("Failed to cleanup receiver after connection failure: ${ex.message}")
+                    }
+                }
+            }
+            throw e
+        }
     }
 
     fun getGattController(deviceAddress: String): GATTController? {
@@ -243,13 +541,14 @@ object HCBle {
         onWriteCharacteristic: ((status: Int, characteristic: BluetoothGattCharacteristic?) -> Unit)? = null,
         onSubscriptionState: ((state: Boolean) -> Unit)? = null,
         onReceive: ((characteristic: BluetoothGattCharacteristic) -> Unit)? = null,
-        autoConnect: Boolean = false
+        autoConnect: Boolean = false,
+        isPrintReceiveLog: Boolean = false
     ): BluetoothGatt {
 
         return device.connectGatt(appContext, autoConnect, object : BluetoothGattCallback() {
 
             /**
-             * TODO: 디바이스와 연결 상태가 변경될 때 호출됩니다.
+             * 디바이스와 연결 상태가 변경될 때 호출됩니다.
              */
             override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
                 super.onConnectionStateChange(gatt, status, newState)
@@ -258,11 +557,46 @@ object HCBle {
 
                 when (newState) {
                     BLEState.STATE_CONNECTED -> {
+                        Logger.d("Device connected, discovering services for $address")
                         mapBLEGatt[address]?.bluetoothGatt?.discoverServices()
                     }
 
+                    BLEState.STATE_DISCONNECTED -> {
+                        Logger.d("Device disconnected: $address")
+
+                        // 자동 연결이 아닐 때만 GATT 닫기
+                        if (!autoConnect) {
+                            try {
+                                gatt?.close()
+                                Logger.d("GATT closed after disconnection for $address")
+                            } catch (e: Exception) {
+                                Logger.e("Error closing GATT: ${e.message}")
+                            }
+                        }
+
+                        // 상태 정리
+                        connectingDevices.remove(address)
+                        disconnectingDevices.remove(address)
+                    }
+
+                    BLEState.STATE_CONNECTING -> {
+                        Logger.d("Connecting to $address")
+                    }
+
+                    BLEState.STATE_DISCONNECTING -> {
+                        Logger.d("Disconnecting from $address")
+                        disconnectingDevices.add(address)
+                    }
+
                     else -> {
-                        if (!autoConnect) gatt?.close()
+                        Logger.d("Unknown connection state $newState for $address")
+                        if (!autoConnect) {
+                            try {
+                                gatt?.close()
+                            } catch (e: Exception) {
+                                Logger.e("Error closing GATT in else block: ${e.message}")
+                            }
+                        }
                     }
                 }
 
@@ -270,24 +604,33 @@ object HCBle {
             }
 
             /**
-             * TODO: GATT 서비스가 발견되었을 때 호출됩니다.
+             * GATT 서비스가 발견되었을 때 호출됩니다.
              */
             override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
                 super.onServicesDiscovered(gatt, status)
                 logGattStateChange("onServicesDiscovered", gatt, status)
                 val address = gatt?.device?.address
+
                 if (status == GATTState.GATT_SUCCESS) {
-                    gatt?.services?.let {
-                        mapBLEGatt[address]?.setGattServiceList(gatt.services)
-                        onGattServiceState?.invoke(status, gatt.services)
+                    gatt?.services?.let { services ->
+                        mapBLEGatt[address]?.setGattServiceList(services)
+                        onGattServiceState?.invoke(status, services)
+                        Logger.d("Services discovered successfully for $address")
+
                         if (device.bondState == BluetoothDevice.BOND_NONE) {
                             Log.d("Bluetooth", "장치가 페어링되지 않음. createBond() 호출...")
                         }
                     } ?: run {
-                        Logger.e("onServicesDiscovered: gatt.services is null")
+                        Logger.e("onServicesDiscovered: gatt.services is null for $address")
                     }
                 } else {
-                    Logger.e("onServicesDiscovered received: ${GATTState.getStatusDescription(status)}")
+                    Logger.e(
+                        "onServicesDiscovered failed for $address: ${
+                            GATTState.getStatusDescription(
+                                status
+                            )
+                        }"
+                    )
                 }
             }
 
@@ -311,7 +654,6 @@ object HCBle {
                 status: Int
             ) {
                 super.onCharacteristicRead(gatt, characteristic, status)
-
                 Log.d(TAG_GATT_SERVICE, "onCharacteristicRead: ${getGattStateString(status)}")
                 onReadCharacteristic?.invoke(status)
             }
@@ -322,8 +664,9 @@ object HCBle {
                 characteristic: BluetoothGattCharacteristic?
             ) {
                 super.onCharacteristicChanged(gatt, characteristic)
-                Log.d(TAG_GATT_SERVICE, "onCharacteristicChanged: ${characteristic?.value}")
-                onReceive?.invoke(characteristic!!)
+                if (isPrintReceiveLog)
+                    Log.d(TAG_GATT_SERVICE, "onCharacteristicChanged: ${characteristic?.value}")
+                characteristic?.let { onReceive?.invoke(it) }
             }
 
             override fun onDescriptorWrite(
@@ -339,29 +682,210 @@ object HCBle {
     }
 
     /**
-     * TODO: 디바이스와 연결을 해제합니다.
-     * TODO: 연결정보도 모두 삭제합니다. 이 메소드를 호출하면 자동연결 까지 해제 됩니다.
+     * 디바이스와 연결을 해제합니다.
+     * 연결정보도 모두 삭제합니다. 이 메소드를 호출하면 자동연결 까지 해제 됩니다.
      * @param callback
      */
     fun disconnect(address: String, callback: (() -> Unit)? = null) {
         Logger.d("disconnect address: $address")
+
+        disconnectingDevices.add(address)
+        connectingDevices.remove(address)
+
         val gattController: GATTController? = mapBLEGatt[address]
-        gattController?.disconnect()
-        gattController?.bluetoothGatt?.close()
-        mapBLEGatt.remove(address)
 
-        Logger.d("Bluetooth: GATT 연결 해제 및 리소스 정리 완료")
-    }
-
-    fun disconnectAll() {
-        mapBLEGatt.forEach { (address, gattController) ->
-            gattController.disconnect()
+        if (gattController == null) {
+            Logger.d("No GATT controller found for $address, cleaning up remaining resources")
+            cleanupRemainingResources(address)
+            disconnectingDevices.remove(address)
+            callback?.invoke()
+            return
         }
-        mapBLEGatt.clear()
+
+        // 실제 GATT 연결 해제 수행
+        val bluetoothGatt = gattController.bluetoothGatt
+
+        try {
+            if (bluetoothGatt != null) {
+                Logger.d("Disconnecting GATT for $address")
+
+                // 1. 실제 GATT 연결 해제
+                bluetoothGatt.disconnect()
+
+                // 2. 연결 해제 완료 대기 (최대 2초)
+                var waitCount = 0
+                val maxWait = 20 // 100ms * 20 = 2초
+                val device = bluetoothAdapter.getRemoteDevice(address)
+
+                while (isConnected(device) && waitCount < maxWait) {
+                    Thread.sleep(100)
+                    waitCount++
+                    Logger.d("Waiting for disconnection... ($waitCount/$maxWait)")
+                }
+
+                // 3. GATT 리소스 완전 해제
+                bluetoothGatt.close()
+                Logger.d("GATT closed for $address")
+
+                if (waitCount >= maxWait && isConnected(device)) {
+                    Logger.w("Forced disconnection timeout for $address, proceeding with cleanup")
+                } else {
+                    Logger.d("Disconnection confirmed for $address")
+                }
+            }
+
+            // 4. GATTController 정리
+            gattController.destroy()
+            Logger.d("GATT controller destroyed for $address")
+
+        } catch (e: Exception) {
+            Logger.e("Error during GATT disconnect: ${e.message}")
+        }
+
+        // 5. 나머지 리소스 정리
+        cleanupRemainingResources(address)
+
+        // 6. 상태 업데이트
+        disconnectingDevices.remove(address)
+        Logger.d("Disconnect completed for $address")
+
+        callback?.invoke()
     }
 
     /**
-     * TODO: GATT Service 리스트를 반환합니다.
+     * 나머지 리소스 정리 함수
+     */
+    private fun cleanupRemainingResources(address: String) {
+        try {
+            // Map에서 제거
+            mapBLEGatt.remove(address)
+
+            // BroadcastReceiver 해제
+            bondStateReceivers[address]?.let { receiver ->
+                try {
+                    appContext.unregisterReceiver(receiver)
+                    bondStateReceivers.remove(address)
+                    Logger.d("BondStateReceiver unregistered for $address")
+                } catch (e: Exception) {
+                    Logger.e("Failed to unregister bondStateReceiver: ${e.message}")
+                }
+            }
+
+            // 상태 정리
+            connectingDevices.remove(address)
+            disconnectingDevices.remove(address)
+
+            // 최근 발견 디바이스 목록에서도 제거
+            recentlyFoundDevices.remove(address)
+
+            Logger.d("Remaining resources cleaned for $address")
+
+        } catch (e: Exception) {
+            Logger.e("Error during resource cleanup: ${e.message}")
+        }
+    }
+
+    /**
+     * 강제 연결 해제 함수
+     */
+    fun forceDisconnect(address: String) {
+        Logger.d("forceDisconnect address: $address")
+
+        val device = bluetoothAdapter.getRemoteDevice(address)
+        val gattController = mapBLEGatt[address]
+
+        // 1. 실제 GATT 연결부터 강제 해제
+        gattController?.bluetoothGatt?.let { gatt ->
+            try {
+                gatt.disconnect()
+                Thread.sleep(200) // 짧은 대기
+                gatt.close()
+                Logger.d("Force disconnected and closed GATT for $address")
+            } catch (e: Exception) {
+                Logger.e("Error during force GATT disconnect: ${e.message}")
+            }
+        }
+
+        // 2. GATTController 정리
+        gattController?.destroy()
+
+        // 3. 모든 리소스 즉시 정리
+        cleanupRemainingResources(address)
+
+        Logger.d("Force disconnect completed for $address")
+    }
+
+    /**
+     * 모든 연결을 해제합니다.
+     */
+    fun disconnectAll() {
+        Logger.d("disconnectAll: Starting disconnect all devices")
+
+        // 모든 스캔 중지
+        stopAllScans()
+
+        val addressList = mapBLEGatt.keys.toList()
+
+        // 각 디바이스를 순차적으로 연결 해제
+        addressList.forEach { address ->
+            try {
+                Logger.d("Disconnecting device: $address")
+                disconnect(address)
+                // 각 디바이스 연결 해제 간에 짧은 지연
+                Thread.sleep(100)
+            } catch (e: Exception) {
+                Logger.e("Error disconnecting $address: ${e.message}")
+            }
+        }
+
+        // 남은 BroadcastReceiver들 정리
+        bondStateReceivers.forEach { (address, receiver) ->
+            try {
+                appContext.unregisterReceiver(receiver)
+                Logger.d("Cleaned up remaining bondStateReceiver for $address")
+            } catch (e: Exception) {
+                Logger.e("Failed to cleanup bondStateReceiver for $address: ${e.message}")
+            }
+        }
+        bondStateReceivers.clear()
+
+        // 상태 관리 변수들 정리
+        connectingDevices.clear()
+        disconnectingDevices.clear()
+        recentlyFoundDevices.clear()
+        mapBLEGatt.clear()
+
+        Logger.d("disconnectAll: All devices disconnected and resources cleaned")
+    }
+
+    fun getSelService(deviceAddress: String): BluetoothGattService? {
+        val gattController: GATTController = mapBLEGatt[deviceAddress] ?: return null
+        if (mapBLEGatt[deviceAddress] == null) {
+            Logger.e("gattController is not initialized")
+            return null
+        }
+
+        return gattController.getTargetService()
+    }
+
+    /**
+     * targetCharacteristic → targetReadCharacteristic
+     */
+    fun getSelReadCharacteristic(deviceAddress: String): BluetoothGattCharacteristic? {
+        val gattController: GATTController = mapBLEGatt[deviceAddress] ?: return null
+        return gattController.getTargetReadCharacteristic()
+    }
+
+    /**
+     * Write Characteristic 조회 함수
+     */
+    fun getSelWriteCharacteristic(deviceAddress: String): BluetoothGattCharacteristic? {
+        val gattController: GATTController = mapBLEGatt[deviceAddress] ?: return null
+        return gattController.getTargetWriteCharacteristic()
+    }
+
+    /**
+     * GATT Service 리스트를 반환합니다.
      * 블루투스가 연결되어 onServicesDiscovered 콜백이 호출 돼야 사용가능합니다.
      * @return
      */
@@ -371,7 +895,7 @@ object HCBle {
     }
 
     /**
-     * TODO: 서비스 UUID를 설정합니다.
+     * 서비스 UUID를 설정합니다.
      * 사용 하고자 하는 서비스 UUID를 설정합니다.
      * @param uuid
      */
@@ -384,7 +908,7 @@ object HCBle {
     }
 
     /**
-     * TODO: Read 캐릭터리스틱 UUID를 설정합니다.
+     * Read 캐릭터리스틱 UUID를 설정합니다.
      * 읽기용 캐릭터리스틱 UUID를 설정합니다.
      * @param characteristicUUID
      */
@@ -397,7 +921,7 @@ object HCBle {
     }
 
     /**
-     * TODO: Write 캐릭터리스틱 UUID를 설정합니다.
+     * Write 캐릭터리스틱 UUID를 설정합니다.
      * 쓰기용 캐릭터리스틱 UUID를 설정합니다.
      * @param characteristicUUID
      */
@@ -410,7 +934,7 @@ object HCBle {
     }
 
     /**
-     * TODO: 캐릭터리스틱을 읽습니다.
+     * 캐릭터리스틱을 읽습니다.
      * setTargetReadCharacteristicUUID로 설정된 캐릭터리스틱을 읽습니다.
      */
     fun readCharacteristic(deviceAddress: String) {
@@ -422,7 +946,7 @@ object HCBle {
     }
 
     /**
-     * TODO: 캐릭터리스틱에 데이터를 씁니다.
+     * 캐릭터리스틱에 데이터를 씁니다.
      * setTargetWriteCharacteristicUUID로 설정된 캐릭터리스틱에 데이터를 씁니다.
      * @param data
      */
@@ -435,7 +959,7 @@ object HCBle {
     }
 
     /**
-     * TODO: 캐릭터리스틱 알림을 설정합니다.
+     * 캐릭터리스틱 알림을 설정합니다.
      * setTargetReadCharacteristicUUID로 설정된 캐릭터리스틱에 알림을 설정합니다.
      * @param isEnable
      */
@@ -489,29 +1013,38 @@ object HCBle {
 
     fun unpairDevice(device: BluetoothDevice): Boolean {
         try {
+            // 언페어링 전에 연결 해제
+            if (isConnected(device)) {
+                disconnect(device.address)
+                // 연결 해제 완료까지 잠시 대기
+                Thread.sleep(500)
+            }
+
             // BluetoothDevice 클래스의 removeBond 메서드 접근
             val method = device.javaClass.getMethod("removeBond")
             return method.invoke(device) as Boolean
         } catch (e: Exception) {
+            Logger.e("unpairDevice error: ${e.message}")
             e.printStackTrace()
         }
         return false
     }
 
     /**
-     * TODO: Bluetooth를 켜거나 끕니다. (Android 9(P) 이하에서만 사용 가능)
+     * Bluetooth를 켜거나 끕니다. (Android 9(P) 이하에서만 사용 가능)
      */
     fun setBluetoothOnOff(isOn: Boolean) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val message = "Android 10(Q) 미만에서만 Bluetooth를 켤 수 있습니다."
             Logger.d("setBluetoothOn: $message")
+            return
         }
 
         val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
         if (bluetoothAdapter == null) {
             val message = "Bluetooth is not supported on this device."
             Logger.d("setBluetoothOn: $message")
-
+            return
         }
 
         if (isOn) {
@@ -521,11 +1054,73 @@ object HCBle {
         } else {
             val message = "Bluetooth OFF."
             Logger.d("setBluetoothOn: $message")
+            // Bluetooth 끄기 전에 모든 연결 해제
+            disconnectAll()
             bluetoothAdapter.disable() // Bluetooth 끄기
         }
     }
 
+    /**
+     * destroy 메소드 강화
+     */
     fun destroy() {
+        Logger.d("destroy: Starting cleanup")
+
+        // 1. 모든 스캔 중지
+        stopAllScans()
+
+        // 2. 모든 GATT 연결 해제
         disconnectAll()
+
+        Logger.d("destroy: Cleanup completed")
+    }
+
+    /**
+     * 연결 상태 디버깅용 함수
+     */
+    fun getConnectionDebugInfo(deviceAddress: String): String {
+        val device = bluetoothAdapter.getRemoteDevice(deviceAddress)
+        return """
+        Device: $deviceAddress
+        Is Connected (manager): ${isConnect(device)}
+        Is Connected (service): ${isConnected(device)}
+        Is Connecting: ${isConnecting(deviceAddress)}
+        Is Disconnecting: ${isDisconnecting(deviceAddress)}
+        Has GATT Controller: ${mapBLEGatt.containsKey(deviceAddress)}
+        Has BondState Receiver: ${bondStateReceivers.containsKey(deviceAddress)}
+        Connection State: ${bluetoothManager.getConnectionState(device, BluetoothProfile.GATT)}
+    """.trimIndent()
+    }
+
+    /**
+     * 스캔 상태 디버깅용 함수
+     */
+    fun getScanDebugInfo(): String {
+        val sessionDetails = activeScanSessions.map { (id, session) ->
+            val elapsed = System.currentTimeMillis() - session.startTime
+            "$id (${elapsed}ms elapsed, ${session.scanPeriod}ms total)"
+        }
+
+        return """
+        Active Scan Sessions: ${activeScanSessions.size}
+        Session Details: ${sessionDetails.joinToString(", ")}
+        Recently Found Devices: ${recentlyFoundDevices.size}
+        Is Scanning: ${isScanning()}
+        """.trimIndent()
+    }
+
+    /**
+     * 메모리 상태 확인용 디버그 메소드
+     */
+    fun getDebugInfo(): String {
+        return """
+            Active Scan Sessions: ${activeScanSessions.size}
+            Connected Devices: ${mapBLEGatt.size}
+            Connecting Devices: ${connectingDevices.size}
+            Disconnecting Devices: ${disconnectingDevices.size}
+            Active BondState Receivers: ${bondStateReceivers.size}
+            Recently Found Devices: ${recentlyFoundDevices.size}
+            Is Scanning: ${isScanning()}
+        """.trimIndent()
     }
 }

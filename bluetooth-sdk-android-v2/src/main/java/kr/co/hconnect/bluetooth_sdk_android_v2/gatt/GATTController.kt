@@ -7,25 +7,130 @@ import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothGattService
 import android.os.Build
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kr.co.hconnect.bluetooth_sdk_android_v2.util.Logger
 import java.util.UUID
 
 @SuppressLint("MissingPermission")
 class GATTController(val bluetoothGatt: BluetoothGatt) {
 
-    private lateinit var gattServiceList: List<BluetoothGattService>
-    lateinit var targetService: BluetoothGattService
-    lateinit var targetReadCharacteristic: BluetoothGattCharacteristic
-    lateinit var targetWriteCharacteristic: BluetoothGattCharacteristic
+    private var gattServiceList: List<BluetoothGattService>? = null // 🔧 수정: nullable로 변경
+    private var targetService: BluetoothGattService? = null // 🔧 수정: nullable로 변경
+    private var targetReadCharacteristic: BluetoothGattCharacteristic? = null // 🔧 수정: nullable로 변경
+    private var targetWriteCharacteristic: BluetoothGattCharacteristic? =
+        null // 🔧 수정: nullable로 변경
 
+    // 🆕 추가: 리소스 정리 상태 관리
+    private var isDestroyed = false
+
+    // 🆕 추가: 현재 활성 Notification Descriptor 추적
+    private var activeNotificationDescriptor: BluetoothGattDescriptor? = null
+
+    // 🔧 수정: disconnect 메소드 개선 - 단계적 정리
     fun disconnect() {
-        bluetoothGatt.disconnect()
-        bluetoothGatt.close()
+        if (isDestroyed) {
+            Logger.d("GATTController already destroyed")
+            return
+        }
+
+        Logger.d("GATTController disconnect started")
+
+        try {
+            // 1. 먼저 notification 비활성화
+            disableAllNotifications()
+
+            // 2. GATT 연결 해제 (close는 하지 않음 - HCBle에서 처리)
+            bluetoothGatt.disconnect()
+
+            Logger.d("GATTController disconnect completed")
+
+        } catch (e: Exception) {
+            Logger.e("Error during GATTController disconnect: ${e.message}")
+        }
+    }
+
+    // 🆕 추가: 모든 notification 비활성화
+    private fun disableAllNotifications() {
+        try {
+            activeNotificationDescriptor?.let { descriptor ->
+                Logger.d("Disabling active notification")
+
+                val disableValue = BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    bluetoothGatt.writeDescriptor(descriptor, disableValue)
+                } else {
+                    descriptor.value = disableValue
+                    bluetoothGatt.writeDescriptor(descriptor)
+                }
+
+                // notification 설정도 해제
+                targetReadCharacteristic?.let { characteristic ->
+                    bluetoothGatt.setCharacteristicNotification(characteristic, false)
+                }
+
+                activeNotificationDescriptor = null
+            }
+        } catch (e: Exception) {
+            Logger.e("Error disabling notifications: ${e.message}")
+        }
+    }
+
+    // 🆕 추가: 완전한 리소스 정리 (HCBle.disconnect에서 호출용)
+    fun destroy() {
+        if (isDestroyed) return
+
+        Logger.d("GATTController destroy started")
+
+        try {
+            // 1. Notification 비활성화
+            disableAllNotifications()
+
+            // 2. GATT 연결 해제
+            bluetoothGatt.disconnect()
+
+            // 3. 참조 정리
+            clearReferences()
+
+            // 4. GATT 리소스 정리 (지연 후)
+            CoroutineScope(Dispatchers.IO).launch {
+                delay(500) // GATT 해제 완료 대기
+                try {
+                    bluetoothGatt.close()
+                    Logger.d("GATTController GATT closed")
+                } catch (e: Exception) {
+                    Logger.e("Error closing GATT: ${e.message}")
+                }
+            }
+
+            isDestroyed = true
+            Logger.d("GATTController destroy completed")
+
+        } catch (e: Exception) {
+            Logger.e("Error during GATTController destroy: ${e.message}")
+        }
+    }
+
+    // 🆕 추가: 모든 참조 정리
+    private fun clearReferences() {
+        gattServiceList = null
+        targetService = null
+        targetReadCharacteristic = null
+        targetWriteCharacteristic = null
+        activeNotificationDescriptor = null
     }
 
     fun getGattServiceList(): List<BluetoothGattService>? {
+        if (isDestroyed) {
+            Logger.e("GATTController is destroyed")
+            return null
+        }
+
         try {
-            if (::gattServiceList.isInitialized.not()) {
+            if (gattServiceList == null) { // 🔧 수정: nullable 체크로 변경
                 Logger.e("getGattServiceList(): gattServiceList is not initialized")
                 return null
             }
@@ -37,10 +142,15 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
     }
 
     fun isGattInitialized(): Boolean {
-        return ::gattServiceList.isInitialized
+        return !isDestroyed && gattServiceList != null // 🔧 수정: nullable 체크로 변경
     }
 
     fun setGattServiceList(gattServiceList: List<BluetoothGattService>) {
+        if (isDestroyed) {
+            Logger.e("GATTController is destroyed")
+            return
+        }
+
         if (gattServiceList.isEmpty()) {
             Logger.e("setGattServiceList(): gattServiceList is empty")
             return
@@ -57,16 +167,21 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
     }
 
     fun setTargetServiceUUID(uuid: String) {
+        if (isDestroyed) {
+            Logger.e("GATTController is destroyed")
+            return
+        }
+
         try {
-            if (::gattServiceList.isInitialized.not()) {
+            if (gattServiceList == null) { // 🔧 수정: nullable 체크로 변경
                 Logger.e("setTargetServiceUUID: gattServiceList is not initialized")
                 return
             }
 
-            val findService = gattServiceList.find { it.uuid.toString() == uuid }
+            val findService = gattServiceList!!.find { it.uuid.toString() == uuid }
 
             Logger.d("내가 선택한 서비스 uuid: ${uuid}")
-            gattServiceList.forEach { service ->
+            gattServiceList!!.forEach { service ->
                 Logger.d("2Registered Service UUID: ${service.uuid}")
                 service.characteristics.forEach { characteristic ->
                     Logger.d("2Registered Characteristic UUID: ${characteristic.uuid}")
@@ -87,13 +202,18 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
     }
 
     fun setTargetReadCharacteristicUUID(characteristicUUID: String) {
+        if (isDestroyed) {
+            Logger.e("GATTController is destroyed")
+            return
+        }
+
         try {
-            if (::targetService.isInitialized.not()) {
+            if (targetService == null) { // 🔧 수정: nullable 체크로 변경
                 Logger.e("setTargetReadCharacteristicUUID: Service is not initialized")
                 return
             }
 
-            val findCharacteristic = targetService.characteristics.find {
+            val findCharacteristic = targetService!!.characteristics.find {
                 it.uuid.toString() == characteristicUUID
             }
 
@@ -111,13 +231,18 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
     }
 
     fun setTargetWriteCharacteristicUUID(characteristicUUID: String) {
+        if (isDestroyed) {
+            Logger.e("GATTController is destroyed")
+            return
+        }
+
         try {
-            if (::targetService.isInitialized.not()) {
+            if (targetService == null) { // 🔧 수정: nullable 체크로 변경
                 Logger.e("setTargetWriteCharacteristicUUID: Service is not initialized")
                 return
             }
 
-            val findCharacteristic = targetService.characteristics.find {
+            val findCharacteristic = targetService!!.characteristics.find {
                 it.uuid.toString() == characteristicUUID
             }
 
@@ -135,77 +260,161 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
     }
 
     fun readCharacteristic() {
-        if (::targetReadCharacteristic.isInitialized.not()) {
+        if (isDestroyed) {
+            Logger.e("GATTController is destroyed")
+            return
+        }
+
+        if (targetReadCharacteristic == null) { // 🔧 수정: nullable 체크로 변경
             Logger.e("targetReadCharacteristic is not initialized")
             return
         }
-        bluetoothGatt.readCharacteristic(targetReadCharacteristic)
+
+        try {
+            bluetoothGatt.readCharacteristic(targetReadCharacteristic!!)
+        } catch (e: Exception) {
+            Logger.e("Error reading characteristic: ${e.message}")
+        }
     }
 
     fun writeCharacteristic(data: ByteArray) {
-        if (::targetWriteCharacteristic.isInitialized.not()) {
+        if (isDestroyed) {
+            Logger.e("GATTController is destroyed")
+            return
+        }
+
+        if (targetWriteCharacteristic == null) { // 🔧 수정: nullable 체크로 변경
             Logger.e("targetWriteCharacteristic is not initialized")
             return
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // API 33 이상
-            bluetoothGatt.writeCharacteristic(
-                targetWriteCharacteristic,
-                data,
-                BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-            )
-        } else { // API 32 이하
-            targetWriteCharacteristic.value = data
-            bluetoothGatt.writeCharacteristic(targetWriteCharacteristic)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // API 33 이상
+                bluetoothGatt.writeCharacteristic(
+                    targetWriteCharacteristic!!,
+                    data,
+                    BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                )
+            } else { // API 32 이하
+                targetWriteCharacteristic!!.value = data
+                bluetoothGatt.writeCharacteristic(targetWriteCharacteristic!!)
+            }
+        } catch (e: Exception) {
+            Logger.e("Error writing characteristic: ${e.message}")
         }
     }
 
     fun setCharacteristicNotification(isEnable: Boolean, isIndicate: Boolean = false) {
-        if (::gattServiceList.isInitialized.not()) {
+        if (isDestroyed) {
+            Logger.e("GATTController is destroyed")
+            return
+        }
+
+        if (gattServiceList == null) { // 🔧 수정: nullable 체크로 변경
             Logger.e("gattServiceList is not initialized")
             return
         }
-        if (::targetService.isInitialized.not()) {
+        if (targetService == null) { // 🔧 수정: nullable 체크로 변경
             Logger.e("targetService is not initialized")
             return
         }
-        if (::targetReadCharacteristic.isInitialized.not()) {
+        if (targetReadCharacteristic == null) { // 🔧 수정: nullable 체크로 변경
             Logger.e("targetReadCharacteristic is not initialized")
             return
         }
 
-        // 알림 또는 인디케이션 설정
-        bluetoothGatt.setCharacteristicNotification(targetReadCharacteristic, isEnable)
+        try {
 
-        // CCCD (Client Characteristic Configuration Descriptor) UUID
-        val descriptor =
-            targetReadCharacteristic.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"))
+            // 알림 또는 인디케이션 설정
+            bluetoothGatt.setCharacteristicNotification(targetReadCharacteristic!!, isEnable)
 
-        // Descriptor가 존재하는지 체크
-        descriptor?.let {
-            val value = when {
-                isEnable && isIndicate -> BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
-                isEnable -> BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-                else -> BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
+            // CCCD (Client Characteristic Configuration Descriptor) UUID
+            val descriptor =
+                targetReadCharacteristic!!.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"))
+
+            // Descriptor가 존재하는지 체크
+            descriptor?.let {
+                val value = when {
+                    isEnable && isIndicate -> BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
+                    isEnable -> BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                    else -> BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
+                }
+
+                // 🔧 수정: 활성 descriptor 추적
+                if (isEnable) {
+                    activeNotificationDescriptor = descriptor
+                } else {
+                    activeNotificationDescriptor = null
+                }
+
+                // API 33 이상인 경우와 이하 버전에 맞게 처리
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    bluetoothGatt.writeDescriptor(descriptor, value)
+                } else {
+                    descriptor.value = value
+                    bluetoothGatt.writeDescriptor(descriptor)
+                }
+
+                Logger.d("Notification ${if (isEnable) "enabled" else "disabled"} for characteristic")
+
+            } ?: run {
+                Logger.e("Descriptor not found for targetReadCharacteristic")
             }
 
-            // API 33 이상인 경우와 이하 버전에 맞게 처리
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                bluetoothGatt.writeDescriptor(descriptor, value)
-            } else {
-                descriptor.value = value
-                bluetoothGatt.writeDescriptor(descriptor)
-            }
-        } ?: Logger.e("Descriptor not found for targetReadCharacteristic")
+        } catch (e: Exception) {
+            Logger.e("Error setting characteristic notification: ${e.message}")
+        }
     }
 
     fun readCharacteristicNotification() {
-        if (::targetReadCharacteristic.isInitialized.not()) {
+        if (isDestroyed) {
+            Logger.e("GATTController is destroyed")
+            return
+        }
+
+        if (targetReadCharacteristic == null) { // 🔧 수정: nullable 체크로 변경
             Logger.e("targetReadCharacteristic is not initialized")
             return
         }
-        val descriptor =
-            targetReadCharacteristic.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"))
-        bluetoothGatt.readDescriptor(descriptor)
+
+        try {
+            val descriptor =
+                targetReadCharacteristic!!.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"))
+            descriptor?.let {
+                bluetoothGatt.readDescriptor(it)
+            } ?: Logger.e("Descriptor not found for readCharacteristicNotification")
+        } catch (e: Exception) {
+            Logger.e("Error reading characteristic notification: ${e.message}")
+        }
+    }
+
+    // 🆕 추가: 안전한 getter 메소드들 (HCBle에서 호출용)
+    fun getTargetService(): BluetoothGattService? {
+        return if (isDestroyed) null else targetService
+    }
+
+    fun getTargetReadCharacteristic(): BluetoothGattCharacteristic? {
+        return if (isDestroyed) null else targetReadCharacteristic
+    }
+
+    fun getTargetWriteCharacteristic(): BluetoothGattCharacteristic? {
+        return if (isDestroyed) null else targetWriteCharacteristic
+    }
+
+    // 🆕 추가: 상태 확인 메소드
+    fun isValid(): Boolean {
+        return !isDestroyed
+    }
+
+    // 🆕 추가: 디버그 정보
+    fun getDebugInfo(): String {
+        return """
+            IsDestroyed: $isDestroyed
+            GattServiceList: ${gattServiceList?.size ?: "null"}
+            TargetService: ${targetService?.uuid ?: "null"}
+            TargetReadCharacteristic: ${targetReadCharacteristic?.uuid ?: "null"}
+            TargetWriteCharacteristic: ${targetWriteCharacteristic?.uuid ?: "null"}
+            ActiveNotificationDescriptor: ${activeNotificationDescriptor != null}
+        """.trimIndent()
     }
 }
