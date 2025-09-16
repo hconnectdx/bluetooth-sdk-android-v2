@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import kr.co.kmwdev.bluetooth_sdk_android_v2_example.bluetooth.ui.BluetoothConnectionActivity
+import kr.co.kmwdev.bluetooth_sdk_android_v2_example.ui.BloodActivity
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -20,6 +21,11 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.testButton).setOnClickListener {
             val intent = Intent(this, BluetoothConnectionActivity::class.java)
+            startActivity(intent)
+        }
+
+        findViewById<Button>(R.id.btnBlood).setOnClickListener {
+            val intent = Intent(this, BloodActivity::class.java)
             startActivity(intent)
         }
     }

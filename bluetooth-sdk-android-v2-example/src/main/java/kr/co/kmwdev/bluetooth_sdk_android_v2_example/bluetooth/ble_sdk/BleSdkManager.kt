@@ -59,6 +59,7 @@ object BleSdkManager {
     private fun doScan(onScanResult: (ScanResult) -> Unit, onScanStop: () -> Unit) {
 
         HCBle.scanLeDevice(
+            scanId = "",
             onScanResult = { scanResult: ScanResult ->
                 onScanResult.invoke(scanResult)
             },

@@ -34,4 +34,13 @@
         android:text="notify"
         app:layout_constraintTop_toBottomOf="@id/testButton" />
 
+
+    <Button
+        android:id="@+id/btnBlood"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="혈액투석 과제"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/notifyButton" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>
