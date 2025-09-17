@@ -71,7 +71,7 @@ object BleSdkManager {
     /**
      * Stop BLE scan
      */
-    fun stopBleScan(sessionId: String) {
-//        HCBle.scanStop()
+    fun stopBleScan() {
+        HCBle.stopScanSession()
     }
 }

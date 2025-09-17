@@ -173,7 +173,7 @@ object HCBle {
      * 특정 스캔 세션을 중지합니다.
      * @param sessionId 중지할 스캔 세션 ID
      */
-    fun stopScanSession(sessionId: String): Boolean {
+    fun stopScanSession(sessionId: String = "general"): Boolean {
         val session = activeScanSessions[sessionId]
         if (session == null) {
             Logger.w("Scan session $sessionId not found")
