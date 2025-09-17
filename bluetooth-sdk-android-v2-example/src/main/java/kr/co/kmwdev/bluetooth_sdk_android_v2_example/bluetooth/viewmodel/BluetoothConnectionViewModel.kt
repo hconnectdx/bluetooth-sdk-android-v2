@@ -252,7 +252,7 @@ class BluetoothConnectionViewModel : ViewModel() {
     }
 
     fun scanStop(sessionId: String) {
-        BleSdkManager.stopBleScan(sessionId)
+        BleSdkManager.stopBleScan()
     }
 
     @SuppressLint("MissingPermission")

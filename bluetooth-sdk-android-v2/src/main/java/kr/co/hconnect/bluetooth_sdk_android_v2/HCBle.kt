@@ -131,7 +131,7 @@ object HCBle {
                     suspendCancellableCoroutine<Unit> { continuation ->
                         continuation.invokeOnCancellation {
                             Logger.d("Scan session $scanId: Canceled")
-                            bluetoothLeScanner.stopScan(scanHandler.leScanCallback)
+                            stopScanSession(scanId)
                             cleanupScanSession(scanId)
                             onScanStop()
                         }
@@ -142,7 +142,7 @@ object HCBle {
             } finally {
                 // 스캔 종료 처리
                 try {
-                    bluetoothLeScanner.stopScan(scanHandler.leScanCallback)
+                    stopScanSession(scanId)
                 } catch (e: Exception) {
                     Logger.e("Error stopping scan for session $scanId: ${e.message}")
                 }
