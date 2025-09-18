@@ -21,6 +21,8 @@ import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
@@ -29,6 +31,9 @@ import kr.co.hconnect.bluetooth_sdk_android_v2.gatt.GATTController
 import kr.co.hconnect.bluetooth_sdk_android_v2.gatt.GATTState
 import kr.co.hconnect.bluetooth_sdk_android_v2.scan.BleScanHandler
 import kr.co.hconnect.bluetooth_sdk_android_v2.util.Logger
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -41,6 +46,14 @@ object HCBle {
     private lateinit var bluetoothManager: BluetoothManager
     private lateinit var bluetoothAdapter: BluetoothAdapter
     private lateinit var bluetoothLeScanner: BluetoothLeScanner
+
+    // gatt 메모리 누수 감지용 변수
+    private var gattLeakMonitorJob: Job? = null
+    private var previousClientIf = 0
+    private val gattClientIfHistory = mutableListOf<Int>() // clientIf 값 추적
+
+    private var gattUsageMonitorJob: Job? = null
+
 
     // 스캔 세션 관리
     data class ScanSession(
@@ -72,7 +85,7 @@ object HCBle {
      * BLE를 초기화합니다.
      * @param context
      */
-    fun init(context: Context) {
+    fun init(context: Context, memoryLeakMonitoringStatus: Boolean = false) {
         if (HCBle::appContext.isInitialized) {
             Log.e(TAG, "appContext already to initialize")
             return
@@ -84,6 +97,222 @@ object HCBle {
         bluetoothLeScanner = bluetoothAdapter.bluetoothLeScanner
 
         Log.d(TAG, "BLE Initialized")
+
+        // GATT 누수 모니터링 시작
+        if (memoryLeakMonitoringStatus)
+
+            startGattClientUsageMonitoring()
+    }
+
+
+    /**
+     * GATT 클라이언트 사용량 모니터링 시작
+     */
+    fun startGattClientUsageMonitoring() {
+        stopGattClientUsageMonitoring() // 기존 모니터링 중지
+
+        gattUsageMonitorJob = CoroutineScope(Dispatchers.IO).launch {
+            while (isActive) {
+                try {
+                    checkGattClientUsage()
+                    delay(1000) // 1초 대기
+                } catch (e: Exception) {
+                    Log.e("GATT_CHECK", "Error monitoring GATT usage: ${e.message}")
+                }
+            }
+        }
+        Log.d("GATT_CHECK", "GATT client usage monitoring started")
+    }
+
+    /**
+     * GATT 클라이언트 사용량 체크
+     */
+    private fun checkGattClientUsage() {
+        val bluetoothManager =
+            appContext.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        val connectedDevices = bluetoothManager.getConnectedDevices(BluetoothProfile.GATT)
+
+        // 타임스탬프 추가
+        val timestamp = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+
+        Log.d("GATT_CHECK", "[$timestamp] ===== GATT Client Usage =====")
+        Log.d("GATT_CHECK", "System connected GATT devices: ${connectedDevices.size}")
+        Log.d("GATT_CHECK", "App managed GATT controllers: ${mapBLEGatt.size}")
+
+        if (connectedDevices.isNotEmpty()) {
+            Log.d("GATT_CHECK", "--- Connected Devices ---")
+            connectedDevices.forEach { device ->
+                val deviceName = device.name ?: "Unknown"
+                val isManaged = mapBLEGatt.containsKey(device.address)
+                val managedStatus = if (isManaged) "[MANAGED]" else "[EXTERNAL]"
+                Log.d("GATT_CHECK", "$managedStatus $deviceName (${device.address})")
+            }
+        }
+
+        // 추가 정보: 앱이 관리하는 디바이스 중 시스템에 없는 것 찾기
+        val orphanedControllers = mapBLEGatt.keys.filter { address ->
+            !connectedDevices.any { it.address == address }
+        }
+
+        if (orphanedControllers.isNotEmpty()) {
+            Log.w("GATT_CHECK", "⚠️ Orphaned controllers (not in system): $orphanedControllers")
+        }
+
+        // GATT 리소스 사용률
+        val usagePercentage = (connectedDevices.size / 32.0 * 100).toInt()
+        val usageBar = "█".repeat(usagePercentage / 5).padEnd(20, '░')
+        Log.d("GATT_CHECK", "Usage: [$usageBar] ${connectedDevices.size}/32 ($usagePercentage%)")
+
+        // 경고 레벨
+        when {
+            connectedDevices.size >= 30 -> {
+                Log.e("GATT_CHECK", "🚨 CRITICAL: Near GATT limit!")
+            }
+
+            connectedDevices.size >= 25 -> {
+                Log.w("GATT_CHECK", "⚠️ WARNING: High GATT usage!")
+            }
+        }
+
+        Log.d("GATT_CHECK", "=====================================")
+    }
+
+    /**
+     * GATT 클라이언트 사용량 모니터링 중지
+     */
+    fun stopGattClientUsageMonitoring() {
+        gattUsageMonitorJob?.cancel()
+        gattUsageMonitorJob = null
+        Log.d("GATT_CHECK", "GATT client usage monitoring stopped")
+    }
+
+    /**
+     * 모니터링 상태 확인
+     */
+    fun isGattUsageMonitoring(): Boolean = gattUsageMonitorJob?.isActive == true
+
+    /**
+     * GATT 리소스 누수 모니터링 시작
+     */
+    fun startGattLeakMonitoring() {
+        gattLeakMonitorJob?.cancel()
+
+        gattLeakMonitorJob = CoroutineScope(Dispatchers.IO).launch {
+            while (isActive) {
+                checkGattResourceLeak()
+                delay(1000) // 1초마다
+            }
+        }
+    }
+
+    /**
+     * GATT 리소스 누수 체크
+     */
+    private fun checkGattResourceLeak() {
+        try {
+            // 1. 시스템 GATT 연결 수와 내부 관리 수 비교
+            val systemConnected = bluetoothManager.getConnectedDevices(BluetoothProfile.GATT)
+            val internalCount = mapBLEGatt.size
+            val systemCount = systemConnected.size
+
+            Log.d("GATT_LEAK", "===== GATT Status =====")
+            Log.d("GATT_LEAK", "Internal controllers: $internalCount")
+            Log.d("GATT_LEAK", "System connections: $systemCount")
+
+            // 2. close() 호출 안 된 GATT 찾기
+            mapBLEGatt.forEach { (address, controller) ->
+                val device = bluetoothAdapter.getRemoteDevice(address)
+                val state = bluetoothManager.getConnectionState(device, BluetoothProfile.GATT)
+
+                // 시스템은 연결 끊겼는데 컨트롤러가 남아있는 경우 = close() 안 됨
+                if (state == BluetoothProfile.STATE_DISCONNECTED &&
+                    !connectingDevices.contains(address) &&
+                    !disconnectingDevices.contains(address)
+                ) {
+
+                    Log.e(
+                        "GATT_LEAK",
+                        "❌ GATT NOT CLOSED: $address (disconnected but controller exists)"
+                    )
+                    Log.e(
+                        "GATT_LEAK",
+                        "  → Solution: Must call bluetoothGatt.close() after disconnect"
+                    )
+                }
+            }
+
+            // 3. 시스템에만 있고 내부에 없는 연결 (orphaned GATT)
+            systemConnected.forEach { device ->
+                if (!mapBLEGatt.containsKey(device.address)) {
+                    Log.e(
+                        "GATT_LEAK",
+                        "⚠️ ORPHANED GATT: ${device.address} (system has it but no controller)"
+                    )
+                    Log.e("GATT_LEAK", "  → This GATT was not properly closed")
+                }
+            }
+
+            // 4. GATT 클라이언트 한계 체크 (Android 최대 32개)
+            when {
+                internalCount >= 30 -> {
+                    Log.e("GATT_LEAK", "🚨 CRITICAL: Near GATT limit! ($internalCount/32)")
+                    Log.e("GATT_LEAK", "🚨 Bluetooth service may crash soon!")
+                }
+
+                internalCount >= 25 -> {
+                    Log.e("GATT_LEAK", "⚠️ WARNING: High GATT count ($internalCount/32)")
+                }
+
+                internalCount >= 20 -> {
+                    Log.w("GATT_LEAK", "📊 GATT count getting high: $internalCount/32")
+                }
+            }
+
+            // 5. 연속 증가 패턴 감지 (GATT가 계속 쌓이는지)
+            gattClientIfHistory.add(internalCount)
+            if (gattClientIfHistory.size > 10) {
+                gattClientIfHistory.removeAt(0)
+
+                // 최근 5개가 계속 증가했는지 체크
+                val recent = gattClientIfHistory.takeLast(5)
+                if (recent.size == 5) {
+                    val isLeaking = recent.zipWithNext().all { (prev, curr) -> curr > prev }
+                    if (isLeaking) {
+                        Log.e(
+                            "GATT_LEAK",
+                            "🔴 MEMORY LEAK DETECTED! GATT count keeps increasing: $recent"
+                        )
+                        Log.e("GATT_LEAK", "🔴 bluetoothGatt.close() is NOT being called properly!")
+                    }
+                }
+            }
+
+            // 6. 로그에서 본 clientIf 값 추적 (registerApp 로그의 clientIf=14 같은 값)
+            // 이 값이 계속 증가하면 GATT 클라이언트가 해제 안 되고 쌓이는 것
+            if (internalCount > 0 && internalCount > previousClientIf) {
+                Log.w("GATT_LEAK", "📈 New GATT client registered (count increased)")
+                // clientIf 값은 로그에서만 볼 수 있으므로 간접적으로 추적
+            }
+            previousClientIf = internalCount
+
+            // 7. 블루투스 서비스 다운 위험도 체크
+            if (systemCount >= 30 || internalCount >= 30) {
+                Log.e("GATT_LEAK", "💀 BLUETOOTH SERVICE CRASH IMMINENT!")
+                Log.e("GATT_LEAK", "💀 onBluetoothServiceDown will be triggered soon!")
+            }
+
+        } catch (e: Exception) {
+            Log.e("GATT_LEAK", "Error checking GATT leak: ${e.message}")
+        }
+    }
+
+    /**
+     * GATT 누수 모니터링 중지
+     */
+    fun stopGattLeakMonitoring() {
+        gattLeakMonitorJob?.cancel()
+        gattLeakMonitorJob = null
+        gattClientIfHistory.clear()
     }
 
     /**
@@ -455,43 +684,11 @@ object HCBle {
         }
 
         try {
-            // GATT 연결 생성
+            // GATT 연결 생성 (GATTController는 연결 성공 후 onConnectionStateChange에서 생성됨)
             val gatt = getGattConnection(
                 sessionId,
                 device,
-                // 연결 상태 콜백 래핑 강화
-                { state ->
-                    Logger.d(
-                        "Connection state changed for $deviceAddress: ${
-                            BLEState.getStateString(
-                                state
-                            )
-                        }"
-                    )
-                    when (state) {
-                        BLEState.STATE_CONNECTED -> {
-                            connectingDevices.remove(deviceAddress)
-                            Logger.d("Connection completed for $deviceAddress")
-                            stopScanSession(sessionId = sessionId)
-                        }
-
-                        BLEState.STATE_DISCONNECTED -> {
-                            connectingDevices.remove(deviceAddress)
-                            disconnectingDevices.remove(deviceAddress)
-                            Logger.d("Disconnection completed for $deviceAddress")
-                        }
-
-                        BLEState.STATE_CONNECTING -> {
-                            Logger.d("Connecting to $deviceAddress")
-                        }
-
-                        BLEState.STATE_DISCONNECTING -> {
-                            disconnectingDevices.add(deviceAddress)
-                            Logger.d("Disconnecting from $deviceAddress")
-                        }
-                    }
-                    onConnState?.invoke(state)
-                },
+                onConnState,
                 onGattServiceState,
                 onReadCharacteristic,
                 onWriteCharacteristic,
@@ -501,9 +698,10 @@ object HCBle {
                 isPrintReceiveLog
             )
 
-            // GATTController 생성 및 저장
-            mapBLEGatt[deviceAddress] = GATTController(gatt)
-            Logger.d("Created GATT controller for $deviceAddress")
+            // 여기서는 GATTController를 생성하지 않음
+            // mapBLEGatt[deviceAddress] = GATTController(gatt) <- 이 줄 제거됨
+
+            Logger.d("GATT connection initiated for $deviceAddress")
 
         } catch (e: Exception) {
             Logger.e("Failed to create GATT connection for $deviceAddress: ${e.message}")
@@ -539,7 +737,6 @@ object HCBle {
     }
 
     private fun getGattConnection(
-
         sessionId: String,
         device: BluetoothDevice,
         onConnState: ((state: Int) -> Unit)? = null,
@@ -554,65 +751,99 @@ object HCBle {
         stopScanSession(sessionId = sessionId)
         return device.connectGatt(appContext, autoConnect, object : BluetoothGattCallback() {
 
-            /**
-             * 디바이스와 연결 상태가 변경될 때 호출됩니다.
-             */
             override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
                 super.onConnectionStateChange(gatt, status, newState)
                 logConnStateChange("onConnectionStateChange", gatt, newState)
                 val address = gatt?.device?.address ?: ""
 
-                when (newState) {
-                    BLEState.STATE_CONNECTED -> {
-                        Logger.d("Device connected, discovering services for $address")
-                        mapBLEGatt[address]?.bluetoothGatt?.discoverServices()
+                // status 체크 (에러 처리)
+                when (status) {
+                    BluetoothGatt.GATT_SUCCESS -> {
+                        // 정상 상태, newState 처리 진행
+                        Logger.d("GATT status success for $address")
                     }
 
-                    BLEState.STATE_DISCONNECTED -> {
-                        Logger.d("Device disconnected: $address")
+                    133, 129, 257 -> {  // 일반적인 연결 실패 에러 코드들
+                        Logger.e("Connection failed with error $status for $address")
+                        gatt?.close()
+                        mapBLEGatt.remove(address)
+                        connectingDevices.remove(address)
+                        disconnectingDevices.remove(address)
+                        onConnState?.invoke(BLEState.STATE_DISCONNECTED)
+                        return
+                    }
 
-                        // 자동 연결이 아닐 때만 GATT 닫기
-                        if (!autoConnect) {
-                            try {
-                                gatt?.close()
-                                Logger.d("GATT closed after disconnection for $address")
-                            } catch (e: Exception) {
-                                Logger.e("Error closing GATT: ${e.message}")
-                            }
+                    else -> {
+                        Logger.e("Unexpected GATT status: $status for $address")
+                        gatt?.close()
+                        mapBLEGatt.remove(address)
+                        connectingDevices.remove(address)
+                        disconnectingDevices.remove(address)
+                        onConnState?.invoke(BLEState.STATE_DISCONNECTED)
+                        return
+                    }
+                }
+
+                // newState 처리
+                when (newState) {
+                    BluetoothProfile.STATE_CONNECTED -> {
+                        Logger.d("Device connected to $address")
+                        connectingDevices.remove(address)
+
+                        // 연결 성공 시에만 GATTController 생성 (중복 방지)
+                        if (!mapBLEGatt.containsKey(address) && gatt != null) {
+                            mapBLEGatt[address] = GATTController(gatt)
+                            Logger.d("Created GATT controller for $address")
                         }
+
+                        // 서비스 검색 시작
+                        gatt?.discoverServices()
+                        stopScanSession(sessionId)
+
+                        onConnState?.invoke(BLEState.STATE_CONNECTED)
+                    }
+
+                    BluetoothProfile.STATE_CONNECTING -> {
+                        Logger.d("Connecting to $address")
+                        onConnState?.invoke(BLEState.STATE_CONNECTING)
+                    }
+
+                    BluetoothProfile.STATE_DISCONNECTING -> {
+                        Logger.d("Disconnecting from $address")
+                        disconnectingDevices.add(address)
+                        onConnState?.invoke(BLEState.STATE_DISCONNECTING)
+                    }
+
+                    BluetoothProfile.STATE_DISCONNECTED -> {
+                        Logger.d("Device disconnected from $address")
+
+                        // 무조건 GATT close
+                        gatt?.close()
+                        Logger.d("GATT closed for $address")
+
+                        // 맵에서 컨트롤러 제거
+                        mapBLEGatt.remove(address)
 
                         // 상태 정리
                         connectingDevices.remove(address)
                         disconnectingDevices.remove(address)
-                    }
 
-                    BLEState.STATE_CONNECTING -> {
-                        Logger.d("Connecting to $address")
-                    }
-
-                    BLEState.STATE_DISCONNECTING -> {
-                        Logger.d("Disconnecting from $address")
-                        disconnectingDevices.add(address)
+                        onConnState?.invoke(BLEState.STATE_DISCONNECTED)
                     }
 
                     else -> {
-                        Logger.d("Unknown connection state $newState for $address")
-                        if (!autoConnect) {
-                            try {
-                                gatt?.close()
-                            } catch (e: Exception) {
-                                Logger.e("Error closing GATT in else block: ${e.message}")
-                            }
-                        }
+                        Logger.w("Unknown connection state: $newState for $address")
+                        // 알 수 없는 상태에서도 안전하게 정리
+                        gatt?.close()
+                        mapBLEGatt.remove(address)
+                        connectingDevices.remove(address)
+                        disconnectingDevices.remove(address)
+
+                        onConnState?.invoke(BLEState.STATE_DISCONNECTED)
                     }
                 }
-
-                onConnState?.invoke(newState)
             }
 
-            /**
-             * GATT 서비스가 발견되었을 때 호출됩니다.
-             */
             override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
                 super.onServicesDiscovered(gatt, status)
                 logGattStateChange("onServicesDiscovered", gatt, status)
@@ -633,9 +864,7 @@ object HCBle {
                 } else {
                     Logger.e(
                         "onServicesDiscovered failed for $address: ${
-                            GATTState.getStatusDescription(
-                                status
-                            )
+                            GATTState.getStatusDescription(status)
                         }"
                     )
                 }
@@ -684,7 +913,6 @@ object HCBle {
                 super.onDescriptorWrite(gatt, descriptor, status)
                 onSubscriptionState?.invoke(status == BluetoothGatt.GATT_SUCCESS)
             }
-
         })
     }
 
@@ -696,65 +924,51 @@ object HCBle {
     fun disconnect(address: String, callback: (() -> Unit)? = null) {
         Logger.d("disconnect address: $address")
 
-        disconnectingDevices.add(address)
-        connectingDevices.remove(address)
-
-        val gattController: GATTController? = mapBLEGatt[address]
-
+        val gattController = mapBLEGatt[address]
         if (gattController == null) {
-            Logger.d("No GATT controller found for $address, cleaning up remaining resources")
+            Logger.d("No GATT controller found for $address")
             cleanupRemainingResources(address)
-            disconnectingDevices.remove(address)
             callback?.invoke()
             return
         }
 
-        // 실제 GATT 연결 해제 수행
+        disconnectingDevices.add(address)
+        connectingDevices.remove(address)
+
         val bluetoothGatt = gattController.bluetoothGatt
 
         try {
             if (bluetoothGatt != null) {
-                Logger.d("Disconnecting GATT for $address")
-
-                // 1. 실제 GATT 연결 해제
+                // disconnect만 호출 (close는 onConnectionStateChange에서 처리)
                 bluetoothGatt.disconnect()
+                Logger.d("Called disconnect() for $address")
 
-                // 2. 연결 해제 완료 대기 (최대 2초)
+                // disconnect 콜백 대기 (최대 2초)
                 var waitCount = 0
-                val maxWait = 20 // 100ms * 20 = 2초
-                val device = bluetoothAdapter.getRemoteDevice(address)
+                val maxWait = 20
 
-                while (isConnected(device) && waitCount < maxWait) {
+                while (mapBLEGatt.containsKey(address) && waitCount < maxWait) {
                     Thread.sleep(100)
                     waitCount++
-                    Logger.d("Waiting for disconnection... ($waitCount/$maxWait)")
                 }
 
-                // 3. GATT 리소스 완전 해제
-                bluetoothGatt.close()
-                Logger.d("GATT closed for $address")
-
-                if (waitCount >= maxWait && isConnected(device)) {
-                    Logger.w("Forced disconnection timeout for $address, proceeding with cleanup")
-                } else {
-                    Logger.d("Disconnection confirmed for $address")
+                // 타임아웃 시 강제 close
+                if (mapBLEGatt.containsKey(address)) {
+                    Logger.w("Disconnect timeout, forcing close for $address")
+                    bluetoothGatt.close()
+                    mapBLEGatt.remove(address)
                 }
             }
 
-            // 4. GATTController 정리
+            // GATTController 정리
             gattController.destroy()
-            Logger.d("GATT controller destroyed for $address")
 
         } catch (e: Exception) {
-            Logger.e("Error during GATT disconnect: ${e.message}")
+            Logger.e("Error during disconnect: ${e.message}")
         }
 
-        // 5. 나머지 리소스 정리
         cleanupRemainingResources(address)
-
-        // 6. 상태 업데이트
         disconnectingDevices.remove(address)
-        Logger.d("Disconnect completed for $address")
 
         callback?.invoke()
     }
