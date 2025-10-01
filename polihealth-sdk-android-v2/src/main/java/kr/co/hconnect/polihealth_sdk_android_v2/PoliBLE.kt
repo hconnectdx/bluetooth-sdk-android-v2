@@ -1,5 +1,6 @@
 package kr.co.hconnect.polihealth_sdk_android_v2
 
+import android.Manifest
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattService
@@ -8,6 +9,7 @@ import android.content.Context
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
+import androidx.annotation.RequiresPermission
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -96,9 +98,9 @@ object PoliBLE {
     /**
      * 블루투스 스캔 중지
      */
-    fun stopScan() {
+    fun stopScan(sessionId: String = "general") {
         Log.d(TAG, "블루투스 스캔 중지")
-        HCBle.scanStop()
+        HCBle.stopScanSession(sessionId)
     }
 
     // =============================================================================
@@ -108,6 +110,7 @@ object PoliBLE {
     /**
      * 블루투스 디바이스 연결
      */
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     @RequiresApi(Build.VERSION_CODES.Q)
     fun connectDevice(
         context: Context? = null,
@@ -124,6 +127,7 @@ object PoliBLE {
         this.onReceive = onReceive
 
         HCBle.connectToDevice(
+            sessionId = device.name,
             isAutoConnect = autoConnect,
             device = device,
             onConnState = { state ->

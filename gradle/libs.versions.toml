@@ -1,6 +1,6 @@
 [versions]
 agp = "8.0.0" # Android Gradle Plugin 버전 수정 (8.0.0은 Kotlin 1.6.21과 호환되지 않을 수 있음)
-bluetoothSdkAndroidV2 = "0.0.92"
+bluetoothSdkAndroidV2 = "1.0.5"
 kotlin = "1.6.21"
 coreKtx = "1.6.0"
 junit = "4.13.2"

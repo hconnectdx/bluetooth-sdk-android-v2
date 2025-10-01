@@ -34,6 +34,8 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var deviceListAdapter: DeviceListAdapter
     private val deviceList = mutableListOf<BluetoothDevice>()
+
+    @RequiresApi(Build.VERSION_CODES.Q)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -112,8 +114,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun stopScan() {
-        PoliBLE.stopScan()
+    fun stopScan(sessionId: String = "general") {
+        PoliBLE.stopScan(sessionId)
     }
 
     @RequiresApi(Build.VERSION_CODES.Q)

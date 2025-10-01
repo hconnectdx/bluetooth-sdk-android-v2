@@ -14,15 +14,25 @@
         android:text="혈압 스캔 및 데이터 받기"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        app:layout_constraintEnd_toEndOf="parent"
+        android:visibility="invisible" />
 
     <Button
-        android:id="@+id/btnStartBloodTick"
+        android:id="@+id/btnStartHemoDialysisTick"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="혈액투석 1초마다 받아오기"
+        android:text="처방전 보내기"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toBottomOf="@id/btnStartBloodPressure" />
+
+    <Button
+        android:id="@+id/btnSendPrescription"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="투석기 연결하기"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/btnStartHemoDialysisTick" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

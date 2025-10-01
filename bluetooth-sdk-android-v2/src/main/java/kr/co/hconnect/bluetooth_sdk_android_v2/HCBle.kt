@@ -817,18 +817,21 @@ object HCBle {
                     BluetoothProfile.STATE_DISCONNECTED -> {
                         Logger.d("Device disconnected from $address")
 
-                        // 무조건 GATT close
-                        gatt?.close()
-                        Logger.d("GATT closed for $address")
+                        // autoConnect 가 아닐때 해제
+                        if (!autoConnect) {
+                            gatt?.close()
+                            Logger.d("GATT closed for $address")
 
-                        // 맵에서 컨트롤러 제거
-                        mapBLEGatt.remove(address)
+                            // 맵에서 컨트롤러 제거
+                            mapBLEGatt.remove(address)
 
-                        // 상태 정리
-                        connectingDevices.remove(address)
-                        disconnectingDevices.remove(address)
+                            // 상태 정리
+                            connectingDevices.remove(address)
+                            disconnectingDevices.remove(address)
 
-                        onConnState?.invoke(BLEState.STATE_DISCONNECTED)
+                            onConnState?.invoke(BLEState.STATE_DISCONNECTED)
+                        }
+
                     }
 
                     else -> {
@@ -935,31 +938,7 @@ object HCBle {
         disconnectingDevices.add(address)
         connectingDevices.remove(address)
 
-        val bluetoothGatt = gattController.bluetoothGatt
-
         try {
-            if (bluetoothGatt != null) {
-                // disconnect만 호출 (close는 onConnectionStateChange에서 처리)
-                bluetoothGatt.disconnect()
-                Logger.d("Called disconnect() for $address")
-
-                // disconnect 콜백 대기 (최대 2초)
-                var waitCount = 0
-                val maxWait = 20
-
-                while (mapBLEGatt.containsKey(address) && waitCount < maxWait) {
-                    Thread.sleep(100)
-                    waitCount++
-                }
-
-                // 타임아웃 시 강제 close
-                if (mapBLEGatt.containsKey(address)) {
-                    Logger.w("Disconnect timeout, forcing close for $address")
-                    bluetoothGatt.close()
-                    mapBLEGatt.remove(address)
-                }
-            }
-
             // GATTController 정리
             gattController.destroy()
 
