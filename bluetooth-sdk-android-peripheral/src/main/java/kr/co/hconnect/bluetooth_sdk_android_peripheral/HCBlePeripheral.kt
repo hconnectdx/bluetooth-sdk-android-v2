@@ -1,6 +1,7 @@
 package kr.co.hconnect.bluetooth_sdk_android_peripheral
 
 import android.annotation.SuppressLint
+import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
@@ -14,7 +15,10 @@ import android.bluetooth.le.AdvertiseCallback
 import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
 import android.bluetooth.le.BluetoothLeAdvertiser
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.ParcelUuid
@@ -93,6 +97,29 @@ object HCBlePeripheral {
         get() = currentMtu
 
     private val listeners = CopyOnWriteArrayList<PeripheralEventListener>()
+
+    private var bluetoothStateReceiverRegistered = false
+
+    private val bluetoothStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action != BluetoothAdapter.ACTION_STATE_CHANGED) return
+            val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
+            if (state == BluetoothAdapter.STATE_OFF || state == BluetoothAdapter.STATE_TURNING_OFF) {
+                Log.d(TAG, "블루투스 어댑터 꺼짐 감지 — 리소스 정리")
+                val prevDevice = connectedDevice
+                gattServer?.close()
+                gattServer = null
+                txCharacteristic = null
+                connectedDevice = null
+                currentMtu = 23
+                advertiser = null
+                updateState(PeripheralConnectionState.IDLE)
+                prevDevice?.let { device ->
+                    listeners.forEach { it.onDeviceDisconnected(device) }
+                }
+            }
+        }
+    }
 
     // ────────────────────────────────────────────────────────────────────────
     // GATT Server Callback
@@ -182,6 +209,9 @@ object HCBlePeripheral {
         ) {
             if (descriptor.uuid != PeripheralConfig.CCCD_UUID) return
 
+            @Suppress("DEPRECATION")
+            descriptor.value = value
+
             if (responseNeeded) {
                 gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
             }
@@ -242,6 +272,7 @@ object HCBlePeripheral {
         appContext = context.applicationContext
         this.config = config
         bluetoothManager = appContext.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        registerBluetoothStateReceiver()
         Log.d(TAG, "HCBlePeripheral 초기화 완료")
     }
 
@@ -449,15 +480,15 @@ object HCBlePeripheral {
      */
     fun stop() {
         stopAdvertising()
-        connectedDevice?.let { device ->
-            gattServer?.cancelConnection(device)
-        }
+        val device = connectedDevice
+        connectedDevice = null
+        currentMtu = 23
+        device?.let { gattServer?.cancelConnection(it) }
         gattServer?.clearServices()
         gattServer?.close()
         gattServer = null
         txCharacteristic = null
-        connectedDevice = null
-        currentMtu = 23
+        advertiser = null
         updateState(PeripheralConnectionState.IDLE)
         Log.d(TAG, "HCBlePeripheral 종료됨")
     }
@@ -467,6 +498,7 @@ object HCBlePeripheral {
      */
     fun destroy() {
         stop()
+        unregisterBluetoothStateReceiver()
         removeAllEventListeners()
         Log.d(TAG, "HCBlePeripheral destroy 완료")
     }
@@ -583,6 +615,23 @@ object HCBlePeripheral {
         _connectionState.value = newState
         Log.d(TAG, "상태 변경 → $newState")
         listeners.forEach { it.onConnectionStateChanged(newState) }
+    }
+
+    private fun registerBluetoothStateReceiver() {
+        if (bluetoothStateReceiverRegistered) return
+        val filter = IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)
+        appContext.registerReceiver(bluetoothStateReceiver, filter)
+        bluetoothStateReceiverRegistered = true
+    }
+
+    private fun unregisterBluetoothStateReceiver() {
+        if (!bluetoothStateReceiverRegistered) return
+        try {
+            appContext.unregisterReceiver(bluetoothStateReceiver)
+        } catch (e: Exception) {
+            Log.w(TAG, "블루투스 상태 리시버 해제 중 오류: ${e.message}")
+        }
+        bluetoothStateReceiverRegistered = false
     }
 
     private fun prependLengthHeader(data: ByteArray): ByteArray {
