@@ -118,6 +118,7 @@ class BloodActivity : AppCompatActivity() {
                                                     deviceAddress = deviceAddress,
                                                     isEnable = true
                                                 )
+
                                             }
                                         }
                                     }

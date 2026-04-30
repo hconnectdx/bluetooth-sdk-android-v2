@@ -6,6 +6,8 @@ import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothGattService
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -277,31 +279,50 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
         }
     }
 
+    // 당신의 코드에 추가
     fun writeCharacteristic(data: ByteArray) {
         if (isDestroyed) {
             Logger.e("GATTController is destroyed")
             return
         }
 
-        if (targetWriteCharacteristic == null) { // 🔧 수정: nullable 체크로 변경
+        // ⭐ 샘플처럼 connect() 호출
+        val isConnected = bluetoothGatt.connect()
+        Logger.d("bluetoothGatt.connect() returned: $isConnected")
+
+        if (!isConnected) {
+            Logger.e("❌ GATT is not connected!")
+            return
+        }
+
+        val writeChar = targetWriteCharacteristic ?: run {
             Logger.e("targetWriteCharacteristic is not initialized")
             return
         }
 
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // API 33 이상
-                bluetoothGatt.writeCharacteristic(
-                    targetWriteCharacteristic!!,
-                    data,
-                    BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                )
-            } else { // API 32 이하
-                targetWriteCharacteristic!!.value = data
-                bluetoothGatt.writeCharacteristic(targetWriteCharacteristic!!)
+        // 5ms 딜레이
+        Handler(Looper.getMainLooper()).postDelayed({
+            try {
+                Logger.d("Writing characteristic...")
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    val result = bluetoothGatt.writeCharacteristic(
+                        writeChar,
+                        data,
+                        BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                    )
+                    Logger.d("writeCharacteristic returned: $result")
+                } else {
+                    writeChar.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                    writeChar.value = data
+                    val result = bluetoothGatt.writeCharacteristic(writeChar)
+                    Logger.d("writeCharacteristic returned: $result")
+                }
+            } catch (e: Exception) {
+                Logger.e("Exception: ${e.message}")
+                e.printStackTrace()
             }
-        } catch (e: Exception) {
-            Logger.e("Error writing characteristic: ${e.message}")
-        }
+        }, 5)
     }
 
     fun setCharacteristicNotification(isEnable: Boolean, isIndicate: Boolean = false) {

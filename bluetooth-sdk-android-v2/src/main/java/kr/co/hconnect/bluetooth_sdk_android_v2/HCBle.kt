@@ -54,6 +54,27 @@ object HCBle {
 
     private var gattUsageMonitorJob: Job? = null
 
+    // 재시도 관련 데이터 클래스 및 변수
+    data class ConnectionRetryInfo(
+        val device: BluetoothDevice,
+        val sessionId: String,
+        val retryCount: Int = 0,
+        val maxRetries: Int = 3,
+        val onConnState: ((state: Int) -> Unit)? = null,
+        val onBondState: ((state: Int) -> Unit)? = null,
+        val onGattServiceState: ((state: Int, List<BluetoothGattService>) -> Unit)? = null,
+        val onReadCharacteristic: ((status: Int) -> Unit)? = null,
+        val onWriteCharacteristic: ((status: Int, characteristic: BluetoothGattCharacteristic?) -> Unit)? = null,
+        val onSubscriptionState: ((state: Boolean) -> Unit)? = null,
+        val onReceive: ((characteristic: BluetoothGattCharacteristic) -> Unit)? = null,
+        val useBondingChangeState: Boolean = true,
+        val isAutoConnect: Boolean = false,
+        val isPrintReceiveLog: Boolean = false
+    )
+
+    private val connectionRetryInfoMap = ConcurrentHashMap<String, ConnectionRetryInfo>()
+    private val retryDelayMs = 1000L // 재시도 간 대기 시간 (1초)
+
 
     // 스캔 세션 관리
     data class ScanSession(
@@ -562,6 +583,7 @@ object HCBle {
         useBondingChangeState: Boolean = true,
         isAutoConnect: Boolean = false,
         isPrintReceiveLog: Boolean = false,
+        maxRetries: Int = 3 // 재시도 횟수
     ) {
         val deviceAddress = device.address
 
@@ -599,6 +621,25 @@ object HCBle {
             }
         }
 
+        // 재시도 정보 저장
+        val retryInfo = ConnectionRetryInfo(
+            device = device,
+            sessionId = sessionId,
+            retryCount = 0,
+            maxRetries = maxRetries,
+            onConnState = onConnState,
+            onBondState = onBondState,
+            onGattServiceState = onGattServiceState,
+            onReadCharacteristic = onReadCharacteristic,
+            onWriteCharacteristic = onWriteCharacteristic,
+            onSubscriptionState = onSubscriptionState,
+            onReceive = onReceive,
+            useBondingChangeState = useBondingChangeState,
+            isAutoConnect = isAutoConnect,
+            isPrintReceiveLog = isPrintReceiveLog
+        )
+        connectionRetryInfoMap[deviceAddress] = retryInfo
+
         // 직접 연결 시도
         connectToDeviceInternal(
             sessionId,
@@ -606,6 +647,55 @@ object HCBle {
             onReadCharacteristic, onWriteCharacteristic, onSubscriptionState,
             onReceive, useBondingChangeState, isAutoConnect, isPrintReceiveLog,
         )
+    }
+
+    // 재시도 로직 함수
+    private fun retryConnection(deviceAddress: String) {
+        val retryInfo = connectionRetryInfoMap[deviceAddress]
+
+        if (retryInfo == null) {
+            Logger.e("No retry info found for $deviceAddress")
+            return
+        }
+
+        if (retryInfo.retryCount >= retryInfo.maxRetries) {
+            Logger.e("Max retry attempts (${retryInfo.maxRetries}) reached for $deviceAddress")
+            connectionRetryInfoMap.remove(deviceAddress)
+
+            // 최종 실패 콜백
+            retryInfo.onConnState?.invoke(BLEState.STATE_DISCONNECTED)
+            return
+        }
+
+        // 재시도 카운트 증가
+        val updatedRetryInfo = retryInfo.copy(retryCount = retryInfo.retryCount + 1)
+        connectionRetryInfoMap[deviceAddress] = updatedRetryInfo
+
+        Logger.w("Retrying connection for $deviceAddress (Attempt ${updatedRetryInfo.retryCount}/${retryInfo.maxRetries})")
+
+        // 재시도 전 대기
+        CoroutineScope(Dispatchers.IO).launch {
+            delay(retryDelayMs)
+
+            // 완전히 정리 후 재시도
+            forceDisconnect(deviceAddress)
+            delay(300)
+
+            connectToDeviceInternal(
+                updatedRetryInfo.sessionId,
+                updatedRetryInfo.device,
+                updatedRetryInfo.onConnState,
+                updatedRetryInfo.onBondState,
+                updatedRetryInfo.onGattServiceState,
+                updatedRetryInfo.onReadCharacteristic,
+                updatedRetryInfo.onWriteCharacteristic,
+                updatedRetryInfo.onSubscriptionState,
+                updatedRetryInfo.onReceive,
+                updatedRetryInfo.useBondingChangeState,
+                updatedRetryInfo.isAutoConnect,
+                updatedRetryInfo.isPrintReceiveLog
+            )
+        }
     }
 
     /**
@@ -761,25 +851,54 @@ object HCBle {
                     BluetoothGatt.GATT_SUCCESS -> {
                         // 정상 상태, newState 처리 진행
                         Logger.d("GATT status success for $address")
+
+                        // 연결 성공 시 재시도 정보 제거
+                        if (newState == BluetoothProfile.STATE_CONNECTED) {
+                            connectionRetryInfoMap.remove(address)
+                            Logger.d("Connection successful, cleared retry info for $address")
+                        }
                     }
 
-                    133, 129, 257 -> {  // 일반적인 연결 실패 에러 코드들
+                    133, 129, 257, 22, 8, 19 -> {  // 일반적인 연결 실패 에러 코드들
                         Logger.e("Connection failed with error $status for $address")
+
                         gatt?.close()
                         mapBLEGatt.remove(address)
                         connectingDevices.remove(address)
                         disconnectingDevices.remove(address)
-                        onConnState?.invoke(BLEState.STATE_DISCONNECTED)
+
+                        // 재시도 로직 실행
+                        val retryInfo = connectionRetryInfoMap[address]
+                        if (retryInfo != null && retryInfo.retryCount < retryInfo.maxRetries) {
+                            Logger.w("Will retry connection for $address after ${retryDelayMs}ms")
+                            retryConnection(address)
+                        } else {
+                            // 재시도 횟수 초과 또는 재시도 정보 없음
+                            Logger.e("Connection failed permanently for $address")
+                            connectionRetryInfoMap.remove(address)
+                            onConnState?.invoke(BLEState.STATE_DISCONNECTED)
+                        }
                         return
                     }
 
                     else -> {
                         Logger.e("Unexpected GATT status: $status for $address")
+
                         gatt?.close()
                         mapBLEGatt.remove(address)
                         connectingDevices.remove(address)
                         disconnectingDevices.remove(address)
-                        onConnState?.invoke(BLEState.STATE_DISCONNECTED)
+
+                        // 예상치 못한 에러도 재시도
+                        val retryInfo = connectionRetryInfoMap[address]
+                        if (retryInfo != null && retryInfo.retryCount < retryInfo.maxRetries) {
+                            Logger.w("Unexpected error, will retry connection for $address")
+                            retryConnection(address)
+                        } else {
+                            Logger.e("Connection failed with unexpected status for $address")
+                            connectionRetryInfoMap.remove(address)
+                            onConnState?.invoke(BLEState.STATE_DISCONNECTED)
+                        }
                         return
                     }
                 }
@@ -797,7 +916,12 @@ object HCBle {
                         }
 
                         // 서비스 검색 시작
-                        gatt?.discoverServices()
+//                        gatt?.discoverServices()
+                        CoroutineScope(Dispatchers.Main).launch {
+                            if (mapBLEGatt[address]?.bluetoothGatt?.device?.bondState != BLEState.BOND_BONDED)
+                                mapBLEGatt[address]?.bluetoothGatt?.device?.createBond()
+                            mapBLEGatt[address]?.bluetoothGatt?.discoverServices()
+                        }
                         stopScanSession(sessionId)
 
                         onConnState?.invoke(BLEState.STATE_CONNECTED)
@@ -916,7 +1040,7 @@ object HCBle {
                 super.onDescriptorWrite(gatt, descriptor, status)
                 onSubscriptionState?.invoke(status == BluetoothGatt.GATT_SUCCESS)
             }
-        })
+        }, BluetoothDevice.TRANSPORT_LE)
     }
 
     /**
@@ -925,6 +1049,11 @@ object HCBle {
      * @param callback
      */
     fun disconnect(address: String, callback: (() -> Unit)? = null) {
+
+        // 재시도 정보 제거
+        connectionRetryInfoMap.remove(address)
+        Logger.d("Cleared retry info for $address")
+
         Logger.d("disconnect address: $address")
 
         val gattController = mapBLEGatt[address]
@@ -989,6 +1118,8 @@ object HCBle {
      * 강제 연결 해제 함수
      */
     fun forceDisconnect(address: String) {
+        // 재시도 정보 제거
+        connectionRetryInfoMap.remove(address)
         Logger.d("forceDisconnect address: $address")
 
         val device = bluetoothAdapter.getRemoteDevice(address)

@@ -1,6 +1,12 @@
 import java.io.FileInputStream
 import java.util.Properties
 
+include(":bluetooth-sdk-android-peripheral-example")
+
+
+include(":bluetooth-sdk-android-peripheral")
+
+
 include(":bluetooth-sdk-android-v2-example")
 include(":polihealth-sdk-android-v2-example")
 

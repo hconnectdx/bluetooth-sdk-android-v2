@@ -4,7 +4,7 @@ import java.io.FileInputStream
 plugins {
     alias(libs.plugins.androidLibrary)
     alias(libs.plugins.jetbrainsKotlinAndroid)
-    kotlin("plugin.serialization") version "1.6.21"
+    kotlin("plugin.serialization") version "1.8.22"
     `maven-publish`
 }
 
@@ -72,7 +72,7 @@ dependencies {
     implementation("io.ktor:ktor-client-cio:2.0.3")
     implementation("io.ktor:ktor-client-content-negotiation:2.0.3")
     implementation("io.ktor:ktor-serialization-kotlinx-json:2.0.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.5.1")
 
     implementation("org.slf4j:slf4j-simple:1.7.30")
     implementation(libs.bluetooth.sdk.android.v2)
