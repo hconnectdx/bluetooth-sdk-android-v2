@@ -31,6 +31,14 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
     // 🆕 추가: 현재 활성 Notification Descriptor 추적
     private var activeNotificationDescriptor: BluetoothGattDescriptor? = null
 
+    // 🆕 추가: MTU 협상 상태 관리
+    private var currentMtu: Int = 23
+    private var mtuRequestCallback: ((mtu: Int, success: Boolean) -> Unit)? = null
+
+    /** 마지막으로 협상 완료된 MTU 값 (기본 23) */
+    val negotiatedMtu: Int
+        get() = currentMtu
+
     // 🔧 수정: disconnect 메소드 개선 - 단계적 정리
     fun disconnect() {
         if (isDestroyed) {
@@ -407,6 +415,54 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
         } catch (e: Exception) {
             Logger.e("Error reading characteristic notification: ${e.message}")
         }
+    }
+
+    /**
+     * MTU 협상을 요청한다.
+     * 결과(성공/실패, 실제 협상된 MTU 값)는 [onResult] 콜백으로 비동기 전달된다.
+     * (안드로이드 [BluetoothGatt.requestMtu]의 반환값은 "요청이 큐잉되었는지" 여부일 뿐,
+     * 실제 협상 결과가 아니므로 반드시 콜백 또는 [negotiatedMtu]로 결과를 확인해야 한다.)
+     *
+     * @return 요청이 정상적으로 큐잉되었는지 여부
+     */
+    fun requestMtu(mtu: Int, onResult: ((mtu: Int, success: Boolean) -> Unit)? = null): Boolean {
+        if (isDestroyed) {
+            Logger.e("GATTController is destroyed")
+            onResult?.invoke(currentMtu, false)
+            return false
+        }
+
+        val queued = try {
+            bluetoothGatt.requestMtu(mtu)
+        } catch (e: Exception) {
+            Logger.e("requestMtu($mtu) exception: ${e.message}")
+            false
+        }
+
+        if (queued) {
+            mtuRequestCallback = onResult
+            Logger.d("requestMtu($mtu) queued, waiting for onMtuChanged")
+        } else {
+            Logger.e("requestMtu($mtu) failed to queue")
+            onResult?.invoke(currentMtu, false)
+        }
+
+        return queued
+    }
+
+    /** HCBle의 BluetoothGattCallback.onMtuChanged에서 호출되어 협상 결과를 반영한다. */
+    internal fun handleMtuChanged(mtu: Int, status: Int) {
+        val success = status == BluetoothGatt.GATT_SUCCESS
+        if (success) {
+            Logger.d("MTU negotiated: $currentMtu -> $mtu")
+            currentMtu = mtu
+        } else {
+            Logger.e("MTU negotiation failed (status=$status), keep current=$currentMtu")
+        }
+
+        val callback = mtuRequestCallback
+        mtuRequestCallback = null
+        callback?.invoke(mtu, success)
     }
 
     // 🆕 추가: 안전한 getter 메소드들 (HCBle에서 호출용)
