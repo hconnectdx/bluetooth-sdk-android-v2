@@ -35,7 +35,6 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
 
     // 🆕 추가: MTU 협상 상태 관리
     private var currentMtu: Int = 23
-    private var mtuRequestCallback: ((mtu: Int, success: Boolean) -> Unit)? = null
 
     /** 마지막으로 협상 완료된 MTU 값 (기본 23) */
     val negotiatedMtu: Int
@@ -134,8 +133,9 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
         targetWriteCharacteristic = null
         activeNotificationDescriptor = null
         synchronized(writeLock) {
-            writeQueue.clear()
+            operationQueue.clear()
             isWriteInFlight = false
+            awaitingWriteCallback = false
         }
     }
 
@@ -293,133 +293,240 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
         }
     }
 
-    // ── Write 오퍼레이션 큐 ──────────────────────────────────────────────
-    // BLE GATT는 연결 하나당 한 번에 하나의 오퍼레이션만 진행할 수 있다.
-    // 이전 write의 완료 콜백(onCharacteristicWrite)이 오기 전에 새 write를 또 요청하면
-    // OS가 즉시 ERROR_GATT_WRITE_REQUEST_BUSY(201)로 거부하며, 그 요청은 재시도 없이 유실된다.
-    // 그래서 write 요청을 큐에 쌓아두고, 이전 write가 완료된 뒤에만 다음 write를 실행한다.
-    private class QueuedWrite(val data: ByteArray, var retriesLeft: Int)
+    // ── GATT 오퍼레이션 큐 ──────────────────────────────────────────────
+    // BLE GATT는 연결 하나당 한 번에 하나의 오퍼레이션(characteristic write, descriptor write,
+    // MTU 협상 등)만 진행할 수 있다. 이전 오퍼레이션의 완료 콜백이 오기 전에 새 오퍼레이션을 또
+    // 요청하면 OS가 즉시 ERROR_GATT_WRITE_REQUEST_BUSY(201)로 거부하거나, 심지어 로컬에는 접수된
+    // 것처럼 보이는데도(반환값 성공) 실제로는 완료 콜백이 영영 안 오는 경우도 있었다.
+    // 실측 결과: 연결 직후 requestMtu()가 아직 응답을 못 받은 상태에서 setCharacteristicNotification()의
+    // descriptor write가 겹쳐 발사됐고, 그 descriptor write는 "returned: 0"(로컬 접수 성공)까지는
+    // 찍혔지만 onDescriptorWrite 콜백이 영영 오지 않아 그 뒤의 모든 오퍼레이션이 큐에 걸린 채로
+    // 영구히 멈췄다 — 그래서 MTU 요청까지 포함해 세 종류를 전부 하나의 큐/락으로 묶어 직렬화한다.
+    private sealed class QueuedOperation(var retriesLeft: Int) {
+        class CharWrite(val data: ByteArray, val writeType: Int, retriesLeft: Int) :
+            QueuedOperation(retriesLeft)
 
-    private val writeQueue = ArrayDeque<QueuedWrite>()
+        class DescWrite(val descriptor: BluetoothGattDescriptor, val value: ByteArray, retriesLeft: Int) :
+            QueuedOperation(retriesLeft)
+
+        class MtuReq(
+            val mtu: Int,
+            val onResult: ((mtu: Int, success: Boolean) -> Unit)?,
+            retriesLeft: Int
+        ) : QueuedOperation(retriesLeft)
+    }
+
+    private val operationQueue = ArrayDeque<QueuedOperation>()
     private val writeLock = Any()
     private var isWriteInFlight = false
 
+    // WRITE_TYPE_NO_RESPONSE는 로컬 접수 즉시 자체 완료 처리를 하기 때문에, 그 이후 도착하는
+    // (기기별로 발생 여부가 다른) 지연/유령 콜백이 그다음 큐 항목을 잘못 완료시키지 않도록
+    // "지금 콜백을 기다리는 중인지"를 별도로 추적한다.
+    private var awaitingWriteCallback = false
+
     private companion object {
-        private const val MAX_WRITE_RETRIES = 5
+        // 실측: 연결 직후 descriptor write와 write가 겹치면 그 순간부터 커넥션이 계속 BUSY로
+        // 고착될 수 있었다(관측치: 6초 이상, 40회 재시도 전부 실패). 오퍼레이션 자체는 드물게
+        // 발생하므로 지연에 민감하지 않다고 보고 재시도 예산을 크게 잡는다.
+        private const val MAX_WRITE_RETRIES = 40
         private const val WRITE_ISSUE_DELAY_MS = 5L
         private const val WRITE_RETRY_DELAY_MS = 150L
     }
 
-    fun writeCharacteristic(data: ByteArray) {
+    fun writeCharacteristic(
+        data: ByteArray,
+        writeType: Int = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+    ) {
         if (isDestroyed) {
             Logger.e("GATTController is destroyed")
             return
         }
 
         synchronized(writeLock) {
-            writeQueue.addLast(QueuedWrite(data, MAX_WRITE_RETRIES))
+            operationQueue.addLast(QueuedOperation.CharWrite(data, writeType, MAX_WRITE_RETRIES))
         }
-        Logger.d("writeCharacteristic queued (queueSize=${writeQueue.size})")
-        processNextWrite()
+        Logger.d("writeCharacteristic queued (queueSize=${operationQueue.size}, writeType=$writeType)")
+        processNextOperation()
     }
 
     /**
      * HCBle의 BluetoothGattCallback.onCharacteristicWrite에서 호출된다.
-     * 진행 중이던 write를 큐에서 정리하고, 다음 write를 이어서 진행한다.
+     * 진행 중이던 오퍼레이션을 큐에서 정리하고, 다음 오퍼레이션을 이어서 진행한다.
      */
     internal fun handleCharacteristicWriteResult(status: Int) {
-        val success = status == BluetoothGatt.GATT_SUCCESS
-        Logger.d("handleCharacteristicWriteResult: status=$status success=$success")
-        onCurrentWriteFinished(success = success, canRetry = true)
+        handleOperationCallback("handleCharacteristicWriteResult", status)
     }
 
-    private fun processNextWrite() {
+    /**
+     * HCBle의 BluetoothGattCallback.onDescriptorWrite에서 호출된다.
+     * 진행 중이던 오퍼레이션을 큐에서 정리하고, 다음 오퍼레이션을 이어서 진행한다.
+     */
+    internal fun handleDescriptorWriteResult(status: Int) {
+        handleOperationCallback("handleDescriptorWriteResult", status)
+    }
+
+    private fun handleOperationCallback(source: String, status: Int) {
+        val shouldProcess = synchronized(writeLock) {
+            if (awaitingWriteCallback) {
+                awaitingWriteCallback = false
+                true
+            } else {
+                false
+            }
+        }
+        if (!shouldProcess) {
+            Logger.d("$source: status=$status — 대기 중인 콜백이 없어 무시(지연된 콜백으로 추정)")
+            return
+        }
+        val success = status == BluetoothGatt.GATT_SUCCESS
+        Logger.d("$source: status=$status success=$success")
+        onCurrentOperationFinished(success = success, canRetry = true)
+    }
+
+    private fun processNextOperation() {
         synchronized(writeLock) {
             if (isWriteInFlight || isDestroyed) return
-            if (writeQueue.isEmpty()) return
+            if (operationQueue.isEmpty()) return
             isWriteInFlight = true
-        }
-
-        val isConnected = bluetoothGatt.connect()
-        Logger.d("bluetoothGatt.connect() returned: $isConnected")
-
-        if (!isConnected) {
-            Logger.e("❌ GATT is not connected! dropping queued write")
-            onCurrentWriteFinished(success = false, canRetry = false)
-            return
-        }
-
-        val writeChar = targetWriteCharacteristic ?: run {
-            Logger.e("targetWriteCharacteristic is not initialized")
-            onCurrentWriteFinished(success = false, canRetry = false)
-            return
         }
 
         // 5ms 딜레이 (기존 로직 유지)
         Handler(Looper.getMainLooper()).postDelayed({
-            val queued = synchronized(writeLock) { writeQueue.firstOrNull() }
+            val queued = synchronized(writeLock) { operationQueue.firstOrNull() }
             if (queued == null) {
                 synchronized(writeLock) { isWriteInFlight = false }
                 return@postDelayed
             }
 
-            try {
-                Logger.d("Writing characteristic... (queueSize=${writeQueue.size}, retriesLeft=${queued.retriesLeft})")
-
-                val accepted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    val result = bluetoothGatt.writeCharacteristic(
-                        writeChar,
-                        queued.data,
-                        BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                    )
-                    Logger.d("writeCharacteristic returned: $result")
-                    result == BluetoothStatusCodes.SUCCESS
-                } else {
-                    writeChar.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                    writeChar.value = queued.data
-                    val result = bluetoothGatt.writeCharacteristic(writeChar)
-                    Logger.d("writeCharacteristic returned: $result")
-                    result
-                }
-
-                if (!accepted) {
-                    // OS가 요청 자체를 거부함(BUSY 등) — 이 경우 onCharacteristicWrite 콜백이 오지 않으므로
-                    // 콜백을 기다리지 않고 곧바로 재시도 처리한다.
-                    Logger.e("writeCharacteristic was not accepted by the stack — will retry")
-                    onCurrentWriteFinished(success = false, canRetry = true, retryDelayMs = WRITE_RETRY_DELAY_MS)
-                }
-                // accepted == true 인 경우, 실제 완료 처리는 handleCharacteristicWriteResult(콜백)에서 진행한다.
-
-            } catch (e: Exception) {
-                Logger.e("Exception: ${e.message}")
-                e.printStackTrace()
-                onCurrentWriteFinished(success = false, canRetry = true, retryDelayMs = WRITE_RETRY_DELAY_MS)
+            when (queued) {
+                is QueuedOperation.CharWrite -> issueCharWrite(queued)
+                is QueuedOperation.DescWrite -> issueDescWrite(queued)
+                is QueuedOperation.MtuReq -> issueMtuRequest(queued)
             }
         }, WRITE_ISSUE_DELAY_MS)
     }
 
-    private fun onCurrentWriteFinished(success: Boolean, canRetry: Boolean, retryDelayMs: Long = 0L) {
+    private fun issueMtuRequest(queued: QueuedOperation.MtuReq) {
+        try {
+            Logger.d("Requesting MTU(${queued.mtu})... (queueSize=${operationQueue.size}, retriesLeft=${queued.retriesLeft})")
+
+            val accepted = try {
+                bluetoothGatt.requestMtu(queued.mtu)
+            } catch (e: Exception) {
+                Logger.e("requestMtu(${queued.mtu}) exception: ${e.message}")
+                false
+            }
+            Logger.d("requestMtu returned: $accepted")
+
+            if (!accepted) {
+                Logger.e("requestMtu was not accepted by the stack — will retry")
+                onCurrentOperationFinished(success = false, canRetry = true, retryDelayMs = WRITE_RETRY_DELAY_MS)
+            } else {
+                // onMtuChanged 콜백(handleMtuChanged)을 기다린다.
+                synchronized(writeLock) { awaitingWriteCallback = true }
+            }
+        } catch (e: Exception) {
+            Logger.e("Exception: ${e.message}")
+            e.printStackTrace()
+            onCurrentOperationFinished(success = false, canRetry = true, retryDelayMs = WRITE_RETRY_DELAY_MS)
+        }
+    }
+
+    private fun issueCharWrite(queued: QueuedOperation.CharWrite) {
+        val writeChar = targetWriteCharacteristic ?: run {
+            Logger.e("targetWriteCharacteristic is not initialized")
+            onCurrentOperationFinished(success = false, canRetry = false)
+            return
+        }
+
+        try {
+            Logger.d("Writing characteristic... (queueSize=${operationQueue.size}, retriesLeft=${queued.retriesLeft}, writeType=${queued.writeType})")
+
+            val accepted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val result = bluetoothGatt.writeCharacteristic(writeChar, queued.data, queued.writeType)
+                Logger.d("writeCharacteristic returned: $result")
+                result == BluetoothStatusCodes.SUCCESS
+            } else {
+                writeChar.writeType = queued.writeType
+                writeChar.value = queued.data
+                val result = bluetoothGatt.writeCharacteristic(writeChar)
+                Logger.d("writeCharacteristic returned: $result")
+                result
+            }
+
+            if (!accepted) {
+                // OS가 요청 자체를 거부함(BUSY 등) — 이 경우 콜백이 오지 않으므로 곧바로 재시도 처리한다.
+                Logger.e("writeCharacteristic was not accepted by the stack — will retry")
+                onCurrentOperationFinished(success = false, canRetry = true, retryDelayMs = WRITE_RETRY_DELAY_MS)
+            } else if (queued.writeType == BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE) {
+                // Write Without Response는 원격 ACK가 없다 — onCharacteristicWrite 콜백 발생 여부가
+                // API 레벨/기기별로 일관되지 않으므로 콜백을 기다리지 않고 로컬 접수 성공만으로 완료 처리한다.
+                Logger.d("write-without-response accepted locally — treating as finished")
+                onCurrentOperationFinished(success = true, canRetry = false)
+            } else {
+                // WRITE_TYPE_DEFAULT 등 응답을 받는 타입 — handleCharacteristicWriteResult(콜백)를 기다린다.
+                synchronized(writeLock) { awaitingWriteCallback = true }
+            }
+        } catch (e: Exception) {
+            Logger.e("Exception: ${e.message}")
+            e.printStackTrace()
+            onCurrentOperationFinished(success = false, canRetry = true, retryDelayMs = WRITE_RETRY_DELAY_MS)
+        }
+    }
+
+    private fun issueDescWrite(queued: QueuedOperation.DescWrite) {
+        try {
+            Logger.d("Writing descriptor... (queueSize=${operationQueue.size}, retriesLeft=${queued.retriesLeft})")
+
+            val accepted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val result = bluetoothGatt.writeDescriptor(queued.descriptor, queued.value)
+                Logger.d("writeDescriptor returned: $result")
+                result == BluetoothStatusCodes.SUCCESS
+            } else {
+                queued.descriptor.value = queued.value
+                val result = bluetoothGatt.writeDescriptor(queued.descriptor)
+                Logger.d("writeDescriptor returned: $result")
+                result
+            }
+
+            if (!accepted) {
+                Logger.e("writeDescriptor was not accepted by the stack — will retry")
+                onCurrentOperationFinished(success = false, canRetry = true, retryDelayMs = WRITE_RETRY_DELAY_MS)
+            } else {
+                // onDescriptorWrite 콜백(handleDescriptorWriteResult)을 기다린다.
+                synchronized(writeLock) { awaitingWriteCallback = true }
+            }
+        } catch (e: Exception) {
+            Logger.e("Exception: ${e.message}")
+            e.printStackTrace()
+            onCurrentOperationFinished(success = false, canRetry = true, retryDelayMs = WRITE_RETRY_DELAY_MS)
+        }
+    }
+
+    private fun onCurrentOperationFinished(success: Boolean, canRetry: Boolean, retryDelayMs: Long = 0L) {
         val hasMore: Boolean
         synchronized(writeLock) {
-            val queued = writeQueue.firstOrNull()
+            val queued = operationQueue.firstOrNull()
             when {
                 queued == null -> Unit
-                success -> writeQueue.pollFirst()
+                success -> operationQueue.pollFirst()
                 canRetry && queued.retriesLeft > 0 -> queued.retriesLeft--
                 else -> {
-                    Logger.e("writeCharacteristic dropped after exhausting retries")
-                    writeQueue.pollFirst()
+                    Logger.e("GATT operation dropped after exhausting retries")
+                    operationQueue.pollFirst()
                 }
             }
             isWriteInFlight = false
-            hasMore = writeQueue.isNotEmpty()
+            awaitingWriteCallback = false
+            hasMore = operationQueue.isNotEmpty()
         }
 
         if (!hasMore) return
         if (retryDelayMs > 0) {
-            Handler(Looper.getMainLooper()).postDelayed({ processNextWrite() }, retryDelayMs)
+            Handler(Looper.getMainLooper()).postDelayed({ processNextOperation() }, retryDelayMs)
         } else {
-            processNextWrite()
+            processNextOperation()
         }
     }
 
@@ -444,7 +551,7 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
 
         try {
 
-            // 알림 또는 인디케이션 설정
+            // 알림 또는 인디케이션 설정 (로컬 전용 — 원격으로 전송되지 않으므로 큐잉 불필요)
             bluetoothGatt.setCharacteristicNotification(targetReadCharacteristic!!, isEnable)
 
             // CCCD (Client Characteristic Configuration Descriptor) UUID
@@ -466,15 +573,14 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
                     activeNotificationDescriptor = null
                 }
 
-                // API 33 이상인 경우와 이하 버전에 맞게 처리
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    bluetoothGatt.writeDescriptor(descriptor, value)
-                } else {
-                    descriptor.value = value
-                    bluetoothGatt.writeDescriptor(descriptor)
+                // 실제로 원격에 전송되는 descriptor write는 writeCharacteristic()과 같은 큐를 거친다.
+                // 그렇지 않으면 연결 직후 이 descriptor write와 곧이어 걸리는 write가 서로 완료를
+                // 기다리지 않고 겹쳐서 커넥션이 BUSY 상태로 고착되는 문제가 있었다.
+                synchronized(writeLock) {
+                    operationQueue.addLast(QueuedOperation.DescWrite(descriptor, value, MAX_WRITE_RETRIES))
                 }
-
-                Logger.d("Notification ${if (isEnable) "enabled" else "disabled"} for characteristic")
+                Logger.d("descriptor write queued for notification ${if (isEnable) "enable" else "disable"} (queueSize=${operationQueue.size})")
+                processNextOperation()
 
             } ?: run {
                 Logger.e("Descriptor not found for targetReadCharacteristic")
@@ -510,10 +616,10 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
     /**
      * MTU 협상을 요청한다.
      * 결과(성공/실패, 실제 협상된 MTU 값)는 [onResult] 콜백으로 비동기 전달된다.
-     * (안드로이드 [BluetoothGatt.requestMtu]의 반환값은 "요청이 큐잉되었는지" 여부일 뿐,
-     * 실제 협상 결과가 아니므로 반드시 콜백 또는 [negotiatedMtu]로 결과를 확인해야 한다.)
+     * 다른 GATT 오퍼레이션(characteristic write, descriptor write)과 같은 큐를 거치므로,
+     * 이 요청이 진행 중인 다른 오퍼레이션과 겹쳐서 응답을 못 받는 일이 없다.
      *
-     * @return 요청이 정상적으로 큐잉되었는지 여부
+     * @return 큐잉이 성공했는지 여부 (destroy된 경우에만 false)
      */
     fun requestMtu(mtu: Int, onResult: ((mtu: Int, success: Boolean) -> Unit)? = null): Boolean {
         if (isDestroyed) {
@@ -522,22 +628,12 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
             return false
         }
 
-        val queued = try {
-            bluetoothGatt.requestMtu(mtu)
-        } catch (e: Exception) {
-            Logger.e("requestMtu($mtu) exception: ${e.message}")
-            false
+        synchronized(writeLock) {
+            operationQueue.addLast(QueuedOperation.MtuReq(mtu, onResult, MAX_WRITE_RETRIES))
         }
-
-        if (queued) {
-            mtuRequestCallback = onResult
-            Logger.d("requestMtu($mtu) queued, waiting for onMtuChanged")
-        } else {
-            Logger.e("requestMtu($mtu) failed to queue")
-            onResult?.invoke(currentMtu, false)
-        }
-
-        return queued
+        Logger.d("requestMtu($mtu) queued (queueSize=${operationQueue.size})")
+        processNextOperation()
+        return true
     }
 
     /** HCBle의 BluetoothGattCallback.onMtuChanged에서 호출되어 협상 결과를 반영한다. */
@@ -550,9 +646,13 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
             Logger.e("MTU negotiation failed (status=$status), keep current=$currentMtu")
         }
 
-        val callback = mtuRequestCallback
-        mtuRequestCallback = null
-        callback?.invoke(mtu, success)
+        val pendingCallback = synchronized(writeLock) {
+            (operationQueue.firstOrNull() as? QueuedOperation.MtuReq)?.onResult
+        }
+
+        handleOperationCallback("handleMtuChanged", status)
+
+        pendingCallback?.invoke(mtu, success)
     }
 
     // 🆕 추가: 안전한 getter 메소드들 (HCBle에서 호출용)

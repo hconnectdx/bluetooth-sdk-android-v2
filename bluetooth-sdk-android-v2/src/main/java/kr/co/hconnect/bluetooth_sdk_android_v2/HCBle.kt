@@ -1040,6 +1040,8 @@ object HCBle {
                 status: Int
             ) {
                 super.onDescriptorWrite(gatt, descriptor, status)
+                val address = gatt?.device?.address ?: ""
+                mapBLEGatt[address]?.handleDescriptorWriteResult(status)
                 onSubscriptionState?.invoke(status == BluetoothGatt.GATT_SUCCESS)
             }
 
@@ -1296,12 +1298,16 @@ object HCBle {
      * setTargetWriteCharacteristicUUID로 설정된 캐릭터리스틱에 데이터를 씁니다.
      * @param data
      */
-    fun writeCharacteristic(deviceAddress: String, data: ByteArray) {
+    fun writeCharacteristic(
+        deviceAddress: String,
+        data: ByteArray,
+        writeType: Int = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+    ) {
         val gattController: GATTController = mapBLEGatt[deviceAddress] ?: run {
             Log.e(TAG, "gattController is not initialized")
             return
         }
-        gattController.writeCharacteristic(data)
+        gattController.writeCharacteristic(data, writeType)
     }
 
     /**
