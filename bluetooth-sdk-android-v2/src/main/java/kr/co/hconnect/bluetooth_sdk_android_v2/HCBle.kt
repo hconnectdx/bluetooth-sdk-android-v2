@@ -1040,6 +1040,19 @@ object HCBle {
                 super.onDescriptorWrite(gatt, descriptor, status)
                 onSubscriptionState?.invoke(status == BluetoothGatt.GATT_SUCCESS)
             }
+
+            override fun onMtuChanged(gatt: BluetoothGatt?, mtu: Int, status: Int) {
+                super.onMtuChanged(gatt, mtu, status)
+                val address = gatt?.device?.address ?: ""
+                Logger.d("[$address] onMtuChanged: mtu=$mtu, status=${GATTState.getStatusDescription(status)}")
+
+                val controller = mapBLEGatt[address]
+                if (controller == null) {
+                    Logger.e("onMtuChanged: no GATTController found for $address")
+                    return
+                }
+                controller.handleMtuChanged(mtu, status)
+            }
         }, BluetoothDevice.TRANSPORT_LE)
     }
 

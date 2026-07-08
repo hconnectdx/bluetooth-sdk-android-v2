@@ -131,6 +131,7 @@ object HCBlePeripheral {
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
                     Log.d(TAG, "Central 연결됨: ${device.address}")
+                    Log.d(TAG, "연결시 MTU=$currentMtu, maxPayload=$maxPayload")
                     connectedDevice = device
                     stopAdvertising()
                     updateState(PeripheralConnectionState.CONNECTED)
@@ -153,7 +154,8 @@ object HCBlePeripheral {
         }
 
         override fun onMtuChanged(device: BluetoothDevice, mtu: Int) {
-            Log.d(TAG, "MTU 변경: $mtu (페이로드 최대 ${mtu - 3}바이트)")
+            val prev = currentMtu
+            Log.d(TAG, "MTU 변경: $prev -> $mtu (페이로드 최대 ${mtu - 3}바이트) from ${device.address}")
             currentMtu = mtu
             listeners.forEach { it.onMtuChanged(mtu) }
         }
@@ -217,7 +219,7 @@ object HCBlePeripheral {
             }
 
             val enabled = value.contentEquals(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
-            Log.d(TAG, "Notify ${if (enabled) "구독" else "해제"}: ${device.address}")
+            Log.d(TAG, "Notify ${if (enabled) "구독" else "해제"}: ${device.address} descriptor=${descriptor.uuid} value=${bytesSummary(value)}")
             listeners.forEach { it.onNotifySubscriptionChanged(device, enabled) }
         }
 
@@ -355,14 +357,25 @@ object HCBlePeripheral {
             Log.e(TAG, "연결된 Central 없음, 전송 불가")
             return false
         }
-        val server = gattServer ?: return false
-        val characteristic = txCharacteristic ?: return false
+        val server = gattServer ?: run {
+            Log.e(TAG, "GATT 서버 미오픈 — 전송 불가 (device=${device.address})")
+            return false
+        }
+        val characteristic = txCharacteristic ?: run {
+            Log.e(TAG, "TX Characteristic 미설정 — 전송 불가 (device=${device.address})")
+            return false
+        }
+
+        if (maxPayload <= 0) {
+            Log.e(TAG, "전송 불가: MTU=$currentMtu -> maxPayload=$maxPayload (device=${device.address})")
+            return false
+        }
 
         val framed = prependLengthHeader(data)
         val chunks = framed.toChunks(maxPayload)
 
         Log.d(TAG, "[TX] 원본=${data.size}B  프레임=${framed.size}B  " +
-                "청크=${chunks.size}개(MTU-3=${maxPayload}B)")
+            "청크=${chunks.size}개(MTU-3=${maxPayload}B) device=${device.address}")
 
         notifySemaphore.drainPermits()
 
@@ -374,13 +387,13 @@ object HCBlePeripheral {
             val ok = server.notifyCharacteristicChanged(device, characteristic, false)
 
             if (!ok) {
-                Log.e(TAG, "[TX] notifyCharacteristicChanged 실패 (청크 $index/${chunks.size})")
+                Log.e(TAG, "[TX] notifyCharacteristicChanged 실패 (청크 $index/${chunks.size}) device=${device.address} chunkLen=${chunk.size}")
                 return false
             }
 
             val sent = notifySemaphore.tryAcquire(2, TimeUnit.SECONDS)
             if (!sent) {
-                Log.e(TAG, "[TX] onNotificationSent 타임아웃 (청크 $index) — 전송 중단")
+                Log.e(TAG, "[TX] onNotificationSent 타임아웃 (청크 $index) device=${device.address} — 전송 중단 chunkLen=${chunk.size}")
                 return false
             }
         }
@@ -654,5 +667,12 @@ object HCBlePeripheral {
             offset = end
         }
         return result
+    }
+
+    private fun bytesSummary(b: ByteArray?): String {
+        if (b == null) return "null"
+        val len = b.size
+        val preview = b.take(8).joinToString(" ") { String.format("%02X", it) }
+        return "len=$len first=[$preview]${if (len > 8) "..." else ""}"
     }
 }
