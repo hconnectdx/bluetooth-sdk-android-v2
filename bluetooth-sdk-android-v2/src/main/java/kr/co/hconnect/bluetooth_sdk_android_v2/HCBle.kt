@@ -1007,6 +1007,8 @@ object HCBle {
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     Log.d(TAG_GATT_SERVICE, "onCharacteristicWrite: ${getGattStateString(status)}")
                 }
+                val address = gatt?.device?.address ?: ""
+                mapBLEGatt[address]?.handleCharacteristicWriteResult(status)
                 onWriteCharacteristic?.invoke(status, characteristic)
             }
 

@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothGattService
+import android.bluetooth.BluetoothStatusCodes
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -14,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kr.co.hconnect.bluetooth_sdk_android_v2.util.Logger
+import java.util.ArrayDeque
 import java.util.UUID
 
 @SuppressLint("MissingPermission")
@@ -131,6 +133,10 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
         targetReadCharacteristic = null
         targetWriteCharacteristic = null
         activeNotificationDescriptor = null
+        synchronized(writeLock) {
+            writeQueue.clear()
+            isWriteInFlight = false
+        }
     }
 
     fun getGattServiceList(): List<BluetoothGattService>? {
@@ -287,50 +293,134 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
         }
     }
 
-    // 당신의 코드에 추가
+    // ── Write 오퍼레이션 큐 ──────────────────────────────────────────────
+    // BLE GATT는 연결 하나당 한 번에 하나의 오퍼레이션만 진행할 수 있다.
+    // 이전 write의 완료 콜백(onCharacteristicWrite)이 오기 전에 새 write를 또 요청하면
+    // OS가 즉시 ERROR_GATT_WRITE_REQUEST_BUSY(201)로 거부하며, 그 요청은 재시도 없이 유실된다.
+    // 그래서 write 요청을 큐에 쌓아두고, 이전 write가 완료된 뒤에만 다음 write를 실행한다.
+    private class QueuedWrite(val data: ByteArray, var retriesLeft: Int)
+
+    private val writeQueue = ArrayDeque<QueuedWrite>()
+    private val writeLock = Any()
+    private var isWriteInFlight = false
+
+    private companion object {
+        private const val MAX_WRITE_RETRIES = 5
+        private const val WRITE_ISSUE_DELAY_MS = 5L
+        private const val WRITE_RETRY_DELAY_MS = 150L
+    }
+
     fun writeCharacteristic(data: ByteArray) {
         if (isDestroyed) {
             Logger.e("GATTController is destroyed")
             return
         }
 
-        // ⭐ 샘플처럼 connect() 호출
+        synchronized(writeLock) {
+            writeQueue.addLast(QueuedWrite(data, MAX_WRITE_RETRIES))
+        }
+        Logger.d("writeCharacteristic queued (queueSize=${writeQueue.size})")
+        processNextWrite()
+    }
+
+    /**
+     * HCBle의 BluetoothGattCallback.onCharacteristicWrite에서 호출된다.
+     * 진행 중이던 write를 큐에서 정리하고, 다음 write를 이어서 진행한다.
+     */
+    internal fun handleCharacteristicWriteResult(status: Int) {
+        val success = status == BluetoothGatt.GATT_SUCCESS
+        Logger.d("handleCharacteristicWriteResult: status=$status success=$success")
+        onCurrentWriteFinished(success = success, canRetry = true)
+    }
+
+    private fun processNextWrite() {
+        synchronized(writeLock) {
+            if (isWriteInFlight || isDestroyed) return
+            if (writeQueue.isEmpty()) return
+            isWriteInFlight = true
+        }
+
         val isConnected = bluetoothGatt.connect()
         Logger.d("bluetoothGatt.connect() returned: $isConnected")
 
         if (!isConnected) {
-            Logger.e("❌ GATT is not connected!")
+            Logger.e("❌ GATT is not connected! dropping queued write")
+            onCurrentWriteFinished(success = false, canRetry = false)
             return
         }
 
         val writeChar = targetWriteCharacteristic ?: run {
             Logger.e("targetWriteCharacteristic is not initialized")
+            onCurrentWriteFinished(success = false, canRetry = false)
             return
         }
 
-        // 5ms 딜레이
+        // 5ms 딜레이 (기존 로직 유지)
         Handler(Looper.getMainLooper()).postDelayed({
-            try {
-                Logger.d("Writing characteristic...")
+            val queued = synchronized(writeLock) { writeQueue.firstOrNull() }
+            if (queued == null) {
+                synchronized(writeLock) { isWriteInFlight = false }
+                return@postDelayed
+            }
 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            try {
+                Logger.d("Writing characteristic... (queueSize=${writeQueue.size}, retriesLeft=${queued.retriesLeft})")
+
+                val accepted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     val result = bluetoothGatt.writeCharacteristic(
                         writeChar,
-                        data,
+                        queued.data,
                         BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
                     )
                     Logger.d("writeCharacteristic returned: $result")
+                    result == BluetoothStatusCodes.SUCCESS
                 } else {
                     writeChar.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                    writeChar.value = data
+                    writeChar.value = queued.data
                     val result = bluetoothGatt.writeCharacteristic(writeChar)
                     Logger.d("writeCharacteristic returned: $result")
+                    result
                 }
+
+                if (!accepted) {
+                    // OS가 요청 자체를 거부함(BUSY 등) — 이 경우 onCharacteristicWrite 콜백이 오지 않으므로
+                    // 콜백을 기다리지 않고 곧바로 재시도 처리한다.
+                    Logger.e("writeCharacteristic was not accepted by the stack — will retry")
+                    onCurrentWriteFinished(success = false, canRetry = true, retryDelayMs = WRITE_RETRY_DELAY_MS)
+                }
+                // accepted == true 인 경우, 실제 완료 처리는 handleCharacteristicWriteResult(콜백)에서 진행한다.
+
             } catch (e: Exception) {
                 Logger.e("Exception: ${e.message}")
                 e.printStackTrace()
+                onCurrentWriteFinished(success = false, canRetry = true, retryDelayMs = WRITE_RETRY_DELAY_MS)
             }
-        }, 5)
+        }, WRITE_ISSUE_DELAY_MS)
+    }
+
+    private fun onCurrentWriteFinished(success: Boolean, canRetry: Boolean, retryDelayMs: Long = 0L) {
+        val hasMore: Boolean
+        synchronized(writeLock) {
+            val queued = writeQueue.firstOrNull()
+            when {
+                queued == null -> Unit
+                success -> writeQueue.pollFirst()
+                canRetry && queued.retriesLeft > 0 -> queued.retriesLeft--
+                else -> {
+                    Logger.e("writeCharacteristic dropped after exhausting retries")
+                    writeQueue.pollFirst()
+                }
+            }
+            isWriteInFlight = false
+            hasMore = writeQueue.isNotEmpty()
+        }
+
+        if (!hasMore) return
+        if (retryDelayMs > 0) {
+            Handler(Looper.getMainLooper()).postDelayed({ processNextWrite() }, retryDelayMs)
+        } else {
+            processNextWrite()
+        }
     }
 
     fun setCharacteristicNotification(isEnable: Boolean, isIndicate: Boolean = false) {
