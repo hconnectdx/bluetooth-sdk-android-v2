@@ -176,7 +176,17 @@ object HCBlePeripheral {
             offset: Int,
             value: ByteArray
         ) {
-            if (characteristic.uuid != config.rxCharUUID) return
+            // ATT는 순차 프로토콜 — 응답이 필요한 요청에 무응답 시 파이프 전체가 정지되므로
+            // 대상 UUID가 아니어도 반드시 오류코드로 응답한다.
+            if (characteristic.uuid != config.rxCharUUID) {
+                Log.w(TAG, "지원하지 않는 characteristic write: ${characteristic.uuid} from ${device.address}")
+                if (responseNeeded) {
+                    gattServer?.sendResponse(
+                        device, requestId, BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED, offset, null
+                    )
+                }
+                return
+            }
 
             if (responseNeeded) {
                 gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
@@ -197,6 +207,11 @@ object HCBlePeripheral {
                     device, requestId, BluetoothGatt.GATT_SUCCESS,
                     offset, characteristic.value
                 )
+            } else {
+                Log.w(TAG, "지원하지 않는 characteristic read: ${characteristic.uuid} from ${device.address}")
+                gattServer?.sendResponse(
+                    device, requestId, BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED, offset, null
+                )
             }
         }
 
@@ -209,7 +224,15 @@ object HCBlePeripheral {
             offset: Int,
             value: ByteArray
         ) {
-            if (descriptor.uuid != PeripheralConfig.CCCD_UUID) return
+            if (descriptor.uuid != PeripheralConfig.CCCD_UUID) {
+                Log.w(TAG, "지원하지 않는 descriptor write: ${descriptor.uuid} from ${device.address}")
+                if (responseNeeded) {
+                    gattServer?.sendResponse(
+                        device, requestId, BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED, offset, null
+                    )
+                }
+                return
+            }
 
             @Suppress("DEPRECATION")
             descriptor.value = value
@@ -234,7 +257,18 @@ object HCBlePeripheral {
                     device, requestId, BluetoothGatt.GATT_SUCCESS,
                     0, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
                 )
+            } else {
+                Log.w(TAG, "지원하지 않는 descriptor read: ${descriptor.uuid} from ${device.address}")
+                gattServer?.sendResponse(
+                    device, requestId, BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED, offset, null
+                )
             }
+        }
+
+        override fun onExecuteWrite(device: BluetoothDevice, requestId: Int, execute: Boolean) {
+            // prepared write는 지원하지 않지만 Execute Write 요청도 무응답 시 ATT가 정지된다.
+            Log.w(TAG, "onExecuteWrite(execute=$execute) — prepared write 미지원, 응답만 반환 from ${device.address}")
+            gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
         }
     }
 
