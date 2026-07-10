@@ -314,6 +314,11 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
             val onResult: ((mtu: Int, success: Boolean) -> Unit)?,
             retriesLeft: Int
         ) : QueuedOperation(retriesLeft)
+
+        // discoverServices()/createBond()처럼 자체 콜백 완료를 기다리지 않아도 되지만,
+        // 앞서 큐잉된 MTU 협상 등과 동시에 발사되면 안 되는 오퍼레이션을 위한 타입.
+        // 실행만 하고 곧바로 다음 오퍼레이션으로 넘어간다(재시도 없음).
+        class Action(val block: () -> Unit) : QueuedOperation(0)
     }
 
     private val operationQueue = ArrayDeque<QueuedOperation>()
@@ -403,8 +408,36 @@ class GATTController(val bluetoothGatt: BluetoothGatt) {
                 is QueuedOperation.CharWrite -> issueCharWrite(queued)
                 is QueuedOperation.DescWrite -> issueDescWrite(queued)
                 is QueuedOperation.MtuReq -> issueMtuRequest(queued)
+                is QueuedOperation.Action -> issueAction(queued)
             }
         }, WRITE_ISSUE_DELAY_MS)
+    }
+
+    private fun issueAction(queued: QueuedOperation.Action) {
+        try {
+            queued.block()
+        } catch (e: Exception) {
+            Logger.e("Queued action error: ${e.message}")
+        }
+        onCurrentOperationFinished(success = true, canRetry = false)
+    }
+
+    /**
+     * discoverServices()/createBond()처럼, 앞서 큐잉된 MTU 협상 등의 오퍼레이션과 동시에
+     * 발사되면 안 되는 동작을 안전하게 뒤로 미루기 위한 함수. [block]은 앞선 오퍼레이션들이
+     * 모두 처리된 뒤에 메인 스레드에서 실행된다.
+     */
+    fun enqueueAction(block: () -> Unit) {
+        if (isDestroyed) {
+            Logger.e("GATTController is destroyed")
+            return
+        }
+
+        synchronized(writeLock) {
+            operationQueue.addLast(QueuedOperation.Action(block))
+        }
+        Logger.d("action queued (queueSize=${operationQueue.size})")
+        processNextOperation()
     }
 
     private fun issueMtuRequest(queued: QueuedOperation.MtuReq) {

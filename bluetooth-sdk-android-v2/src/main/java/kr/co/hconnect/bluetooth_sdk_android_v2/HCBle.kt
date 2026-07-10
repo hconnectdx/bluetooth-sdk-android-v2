@@ -915,16 +915,19 @@ object HCBle {
                             Logger.d("Created GATT controller for $address")
                         }
 
-                        // 서비스 검색 시작
-//                        gatt?.discoverServices()
-                        CoroutineScope(Dispatchers.Main).launch {
+                        stopScanSession(sessionId)
+
+                        // onConnState 콜백에서 컨슈머가 requestMtu()를 호출할 수 있으므로, 그 요청이
+                        // GATTController 큐의 앞자리를 차지하도록 먼저 invoke한다. 이후 createBond()/
+                        // discoverServices()는 같은 큐에 넣어서 MTU 협상과 동시에 발사되지 않도록 한다.
+                        // (동시에 발사되면 ATT MTU Exchange 콜백이 조용히 무시되는 문제가 있었음)
+                        onConnState?.invoke(BLEState.STATE_CONNECTED)
+
+                        mapBLEGatt[address]?.enqueueAction {
                             if (mapBLEGatt[address]?.bluetoothGatt?.device?.bondState != BLEState.BOND_BONDED)
                                 mapBLEGatt[address]?.bluetoothGatt?.device?.createBond()
                             mapBLEGatt[address]?.bluetoothGatt?.discoverServices()
                         }
-                        stopScanSession(sessionId)
-
-                        onConnState?.invoke(BLEState.STATE_CONNECTED)
                     }
 
                     BluetoothProfile.STATE_CONNECTING -> {
