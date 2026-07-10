@@ -54,9 +54,14 @@ val projectArtifactId: String = projectProps.getProperty("publication_artifact_i
 
 val rootProjectProps = Properties()
 rootProjectProps.load(FileInputStream(project.file("../local.properties")))
-val githubUrl: String = rootProjectProps.getProperty("githubUrl")
-val githubUsername: String = rootProjectProps.getProperty("githubUsername")
-val githubAccessToken: String = rootProjectProps.getProperty("githubAccessToken")
+
+// 자격증명은 환경변수 우선(GITHUB_URL/GITHUB_USERNAME/GITHUB_TOKEN), 없으면 local.properties
+val githubUrl: String = System.getenv("GITHUB_URL")
+    ?: rootProjectProps.getProperty("githubUrl")
+val githubUsername: String = System.getenv("GITHUB_USERNAME")
+    ?: rootProjectProps.getProperty("githubUsername")
+val githubAccessToken: String = System.getenv("GITHUB_TOKEN")
+    ?: rootProjectProps.getProperty("githubAccessToken")
 
 afterEvaluate {
     publishing {
