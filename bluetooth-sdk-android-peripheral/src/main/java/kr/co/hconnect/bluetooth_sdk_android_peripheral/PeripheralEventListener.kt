@@ -30,6 +30,12 @@ interface PeripheralEventListener {
     /** MTU가 변경되었을 때 */
     fun onMtuChanged(mtu: Int) {}
 
+    /**
+     * 청크 크기 프로브가 끝나 실효 청크 크기가 결정되었을 때.
+     * 프로브 전 후보가 실패한 경우에도 폴백 값(MTU-3)으로 호출된다.
+     */
+    fun onChunkSizeDetermined(chunkSize: Int) {}
+
     /** Central이 Notify를 구독/해제했을 때 */
     fun onNotifySubscriptionChanged(device: BluetoothDevice, enabled: Boolean) {}
 }

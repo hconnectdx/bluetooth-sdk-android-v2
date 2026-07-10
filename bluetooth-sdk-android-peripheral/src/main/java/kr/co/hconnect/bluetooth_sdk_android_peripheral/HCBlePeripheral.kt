@@ -27,8 +27,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.zip.CRC32
 
 /**
  * BLE Peripheral (GATT Server) SDK.
@@ -71,9 +75,52 @@ object HCBlePeripheral {
 
     private val notifySemaphore = Semaphore(0)
 
+    /** notify 발사 직렬화용 락. 오래 잡는 락이므로 객체 모니터와 분리한다. */
+    private val txLock = Any()
+
     private var gattServer: BluetoothGattServer? = null
     private var advertiser: BluetoothLeAdvertiser? = null
     private var txCharacteristic: BluetoothGattCharacteristic? = null
+
+    // ── 엔드투엔드 청크 프로브 상태 ──
+    // notify 반환값/onNotificationSent는 전파에 실린 크기를 보증하지 않으므로(스택 절단 미검출)
+    // 실효 청크 크기는 반드시 수신자(Central)의 PROBE_ACK로만 판정한다.
+    private const val PROBE_PREFIX = "PROBE:"
+    private const val PROBE_ACK_PREFIX = "PROBE_ACK:"
+    private const val PROBE_PADDING: Byte = 0xA5.toByte()
+
+    private class PendingProbe(val seq: Int, val size: Int) {
+        val latch = CountDownLatch(1)
+        @Volatile
+        var ackBytes: Int = -1
+    }
+
+    private val probeSeq = AtomicInteger(0)
+
+    @Volatile
+    private var pendingProbe: PendingProbe? = null
+
+    /** 프로브로 채택된 청크 크기. 0이면 미채택(폴백 MTU-3 사용). 연결 해제 시 리셋. */
+    @Volatile
+    private var probedChunkSize: Int = 0
+
+    /** 실제 전송에 쓰는 청크 크기: 정식 MTU 협상값과 프로브 채택값 중 큰 쪽 */
+    private val effectiveChunkSize: Int get() = maxOf(maxPayload, probedChunkSize)
+
+    // ── 논블로킹 송신 큐 ──
+    private sealed interface TxWork {
+        class Data(val payload: ByteArray) : TxWork
+        object Probe : TxWork
+        object Quit : TxWork
+    }
+
+    @Volatile
+    private var txWorkQueue: LinkedBlockingQueue<TxWork>? = null
+
+    @Volatile
+    private var senderThread: Thread? = null
+
+    private val pendingTxCount = AtomicInteger(0)
 
     private val _connectionState = MutableStateFlow(PeripheralConnectionState.IDLE)
 
@@ -96,6 +143,10 @@ object HCBlePeripheral {
     val negotiatedMtu: Int
         get() = currentMtu
 
+    /** 현재 실효 청크 크기 (프로브 채택값 vs MTU-3 중 큰 쪽) */
+    val currentChunkSize: Int
+        get() = effectiveChunkSize
+
     private val listeners = CopyOnWriteArrayList<PeripheralEventListener>()
 
     private var bluetoothStateReceiverRegistered = false
@@ -112,6 +163,7 @@ object HCBlePeripheral {
                 txCharacteristic = null
                 connectedDevice = null
                 currentMtu = 23
+                resetTxPipeline()
                 advertiser = null
                 updateState(PeripheralConnectionState.IDLE)
                 prevDevice?.let { device ->
@@ -132,6 +184,7 @@ object HCBlePeripheral {
                 BluetoothProfile.STATE_CONNECTED -> {
                     Log.d(TAG, "Central 연결됨: ${device.address}")
                     Log.d(TAG, "연결시 MTU=$currentMtu, maxPayload=$maxPayload")
+                    probedChunkSize = 0
                     connectedDevice = device
                     stopAdvertising()
                     updateState(PeripheralConnectionState.CONNECTED)
@@ -142,6 +195,7 @@ object HCBlePeripheral {
                     if (connectedDevice?.address == device.address) {
                         connectedDevice = null
                         currentMtu = 23
+                        resetTxPipeline()
                         updateState(PeripheralConnectionState.DISCONNECTED)
                         listeners.forEach { it.onDeviceDisconnected(device) }
 
@@ -181,15 +235,19 @@ object HCBlePeripheral {
             if (characteristic.uuid != config.rxCharUUID) {
                 Log.w(TAG, "지원하지 않는 characteristic write: ${characteristic.uuid} from ${device.address}")
                 if (responseNeeded) {
-                    gattServer?.sendResponse(
-                        device, requestId, BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED, offset, null
-                    )
+                    respond(device, requestId, BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED, offset, null)
                 }
                 return
             }
 
             if (responseNeeded) {
-                gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
+                respond(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
+            }
+
+            // PROBE_ACK는 SDK 내부 프로토콜 — 앱 리스너로 전달하지 않고 가로챈다.
+            if (isProbeAck(value)) {
+                handleProbeAck(value)
+                return
             }
 
             Log.d(TAG, "RX 수신: ${value.size}바이트 from ${device.address}")
@@ -203,15 +261,10 @@ object HCBlePeripheral {
             characteristic: BluetoothGattCharacteristic
         ) {
             if (characteristic.uuid == config.txCharUUID) {
-                gattServer?.sendResponse(
-                    device, requestId, BluetoothGatt.GATT_SUCCESS,
-                    offset, characteristic.value
-                )
+                respond(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, characteristic.value)
             } else {
                 Log.w(TAG, "지원하지 않는 characteristic read: ${characteristic.uuid} from ${device.address}")
-                gattServer?.sendResponse(
-                    device, requestId, BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED, offset, null
-                )
+                respond(device, requestId, BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED, offset, null)
             }
         }
 
@@ -227,9 +280,7 @@ object HCBlePeripheral {
             if (descriptor.uuid != PeripheralConfig.CCCD_UUID) {
                 Log.w(TAG, "지원하지 않는 descriptor write: ${descriptor.uuid} from ${device.address}")
                 if (responseNeeded) {
-                    gattServer?.sendResponse(
-                        device, requestId, BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED, offset, null
-                    )
+                    respond(device, requestId, BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED, offset, null)
                 }
                 return
             }
@@ -238,11 +289,17 @@ object HCBlePeripheral {
             descriptor.value = value
 
             if (responseNeeded) {
-                gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
+                respond(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
             }
 
             val enabled = value.contentEquals(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
             Log.d(TAG, "Notify ${if (enabled) "구독" else "해제"}: ${device.address} descriptor=${descriptor.uuid} value=${bytesSummary(value)}")
+
+            // 구독 완료 직후, 프레임 스트림 송신 전에 실효 청크 크기 프로브를 수행한다 (재연결 시마다).
+            if (enabled && config.probeChunkLadder.isNotEmpty()) {
+                ensureSenderThread().offer(TxWork.Probe)
+            }
+
             listeners.forEach { it.onNotifySubscriptionChanged(device, enabled) }
         }
 
@@ -253,22 +310,47 @@ object HCBlePeripheral {
             descriptor: BluetoothGattDescriptor
         ) {
             if (descriptor.uuid == PeripheralConfig.CCCD_UUID) {
-                gattServer?.sendResponse(
+                respond(
                     device, requestId, BluetoothGatt.GATT_SUCCESS,
                     0, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
                 )
             } else {
                 Log.w(TAG, "지원하지 않는 descriptor read: ${descriptor.uuid} from ${device.address}")
-                gattServer?.sendResponse(
-                    device, requestId, BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED, offset, null
-                )
+                respond(device, requestId, BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED, offset, null)
             }
         }
 
         override fun onExecuteWrite(device: BluetoothDevice, requestId: Int, execute: Boolean) {
             // prepared write는 지원하지 않지만 Execute Write 요청도 무응답 시 ATT가 정지된다.
             Log.w(TAG, "onExecuteWrite(execute=$execute) — prepared write 미지원, 응답만 반환 from ${device.address}")
-            gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
+            respond(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
+        }
+    }
+
+    /**
+     * sendResponse 일원화. ATT는 순차 프로토콜이라 응답 누락 1건이 파이프 전체를 정지시키므로,
+     * 서버 핸들이 사라졌거나 호출이 실패하면 반드시 관측 가능한 로그를 남긴다.
+     */
+    private fun respond(
+        device: BluetoothDevice,
+        requestId: Int,
+        status: Int,
+        offset: Int,
+        value: ByteArray?
+    ) {
+        val server = gattServer
+        if (server == null) {
+            Log.e(TAG, "sendResponse 불가 — gattServer=null (requestId=$requestId, ${device.address}) ATT 무응답 위험")
+            return
+        }
+        val ok = try {
+            server.sendResponse(device, requestId, status, offset, value)
+        } catch (e: Exception) {
+            Log.e(TAG, "sendResponse 예외 — requestId=$requestId: ${e.message}")
+            false
+        }
+        if (!ok) {
+            Log.e(TAG, "sendResponse 실패 — requestId=$requestId status=$status (${device.address})")
         }
     }
 
@@ -283,6 +365,15 @@ object HCBlePeripheral {
         }
 
         override fun onStartFailure(errorCode: Int) {
+            // 이미 광고 중(errorCode=3)은 실패가 아니다 — 실패 통지 시 앱이 무한 재시도 루프에 빠진다.
+            if (errorCode == ADVERTISE_FAILED_ALREADY_STARTED) {
+                Log.w(TAG, "광고 시작 실패(ALREADY_STARTED) — 이미 광고 중이므로 성공 취급")
+                if (_connectionState.value != PeripheralConnectionState.CONNECTED) {
+                    updateState(PeripheralConnectionState.ADVERTISING)
+                }
+                listeners.forEach { it.onAdvertiseStarted() }
+                return
+            }
             Log.e(TAG, "광고 시작 실패: errorCode=$errorCode")
             updateState(PeripheralConnectionState.IDLE)
             listeners.forEach { it.onAdvertiseFailed(errorCode) }
@@ -377,16 +468,43 @@ object HCBlePeripheral {
     }
 
     /**
-     * Peripheral → Central 데이터 전송.
+     * Peripheral → Central 데이터 전송 (동기·블로킹).
      *
-     * 4바이트 big-endian 길이 헤더 + 데이터를 MTU 크기로 청크 분할 후
-     * 순서대로 NOTIFY 전송한다.
+     * 프레임 헤더 + 데이터를 실효 청크 크기([currentChunkSize])로 분할 후 순서대로 NOTIFY 전송한다.
+     * 전송이 끝날 때까지 호출 스레드를 블록하므로, 센서 콜백 등 지연에 민감한 경로에서는
+     * [sendDataAsync]를 사용할 것.
      *
      * @param data 전송할 원본 데이터
      * @return 전송 성공 여부
      */
-    @Synchronized
-    fun sendData(data: ByteArray): Boolean {
+    fun sendData(data: ByteArray): Boolean = doSendData(data)
+
+    /**
+     * Peripheral → Central 데이터 전송 (논블로킹).
+     *
+     * 내부 송신 큐에 넣고 즉시 리턴한다. 실제 전송은 전용 송신 스레드가 [sendData]와 동일한
+     * 방식으로 수행한다. 큐가 [PeripheralConfig.txQueueCapacity]에 도달하면 enqueue를 거부하고
+     * false를 반환한다(드롭 정책: 신규 거부 — 무한 큐로 인한 메모리 폭주 방지).
+     * 연결이 끊기면 큐에 남은 데이터는 폐기된다.
+     *
+     * @param data 전송할 원본 데이터
+     * @return 큐 적재 성공 여부 (전송 완료 여부가 아님)
+     */
+    fun sendDataAsync(data: ByteArray): Boolean {
+        if (connectedDevice == null) {
+            Log.e(TAG, "[TX ASYNC] 연결된 Central 없음 — enqueue 거부")
+            return false
+        }
+        if (pendingTxCount.get() >= config.txQueueCapacity) {
+            Log.w(TAG, "[TX ASYNC] 송신 큐 가득참(${config.txQueueCapacity}) — ${data.size}B 드롭")
+            return false
+        }
+        pendingTxCount.incrementAndGet()
+        ensureSenderThread().offer(TxWork.Data(data))
+        return true
+    }
+
+    private fun doSendData(data: ByteArray): Boolean = synchronized(txLock) {
         val device = connectedDevice ?: run {
             Log.e(TAG, "연결된 Central 없음, 전송 불가")
             return false
@@ -400,16 +518,17 @@ object HCBlePeripheral {
             return false
         }
 
-        if (maxPayload <= 0) {
-            Log.e(TAG, "전송 불가: MTU=$currentMtu -> maxPayload=$maxPayload (device=${device.address})")
+        val chunkSize = effectiveChunkSize
+        if (chunkSize <= 0) {
+            Log.e(TAG, "전송 불가: MTU=$currentMtu -> chunkSize=$chunkSize (device=${device.address})")
             return false
         }
 
-        val framed = prependLengthHeader(data)
-        val chunks = framed.toChunks(maxPayload)
+        val framed = frame(data)
+        val chunks = framed.toChunks(chunkSize)
 
         Log.d(TAG, "[TX] 원본=${data.size}B  프레임=${framed.size}B  " +
-            "청크=${chunks.size}개(MTU-3=${maxPayload}B) device=${device.address}")
+            "청크=${chunks.size}개(${chunkSize}B, probed=$probedChunkSize, mtu=$currentMtu) device=${device.address}")
 
         notifySemaphore.drainPermits()
 
@@ -443,8 +562,7 @@ object HCBlePeripheral {
      * @param data 전송할 데이터 (maxPayload 이하)
      * @return 전송 성공 여부
      */
-    @Synchronized
-    fun sendRawData(data: ByteArray): Boolean {
+    fun sendRawData(data: ByteArray): Boolean = synchronized(txLock) {
         val device = connectedDevice ?: run {
             Log.e(TAG, "연결된 Central 없음, 전송 불가")
             return false
@@ -452,8 +570,8 @@ object HCBlePeripheral {
         val server = gattServer ?: return false
         val characteristic = txCharacteristic ?: return false
 
-        if (data.size > maxPayload) {
-            Log.w(TAG, "데이터(${data.size}B)가 maxPayload(${maxPayload}B)보다 큼. sendData() 사용 권장.")
+        if (data.size > effectiveChunkSize) {
+            Log.w(TAG, "데이터(${data.size}B)가 실효 청크(${effectiveChunkSize}B)보다 큼. sendData() 사용 권장.")
         }
 
         notifySemaphore.drainPermits()
@@ -495,6 +613,7 @@ object HCBlePeripheral {
         gattServer?.cancelConnection(device)
         connectedDevice = null
         currentMtu = 23
+        resetTxPipeline()
         updateState(PeripheralConnectionState.IDLE)
         Log.d(TAG, "disconnect() 호출됨")
     }
@@ -530,6 +649,8 @@ object HCBlePeripheral {
         val device = connectedDevice
         connectedDevice = null
         currentMtu = 23
+        resetTxPipeline()
+        stopSenderThread()
         device?.let { gattServer?.cancelConnection(it) }
         gattServer?.clearServices()
         gattServer?.close()
@@ -562,6 +683,8 @@ object HCBlePeripheral {
             State: ${_connectionState.value}
             Connected Device: ${connectedDevice?.address ?: "None"}
             MTU: $currentMtu (payload: $maxPayload)
+            Chunk: $effectiveChunkSize (probed: $probedChunkSize)
+            TX Queue: ${pendingTxCount.get()}/${config.txQueueCapacity}
             GATT Server: ${if (gattServer != null) "Open" else "Closed"}
             Listeners: ${listeners.size}
         """.trimIndent()
@@ -679,6 +802,182 @@ object HCBlePeripheral {
             Log.w(TAG, "블루투스 상태 리시버 해제 중 오류: ${e.message}")
         }
         bluetoothStateReceiverRegistered = false
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // 송신 스레드 / 청크 프로브
+    // ────────────────────────────────────────────────────────────────────────
+
+    @Synchronized
+    private fun ensureSenderThread(): LinkedBlockingQueue<TxWork> {
+        val existing = txWorkQueue
+        if (existing != null && senderThread?.isAlive == true) return existing
+
+        val queue = LinkedBlockingQueue<TxWork>()
+        txWorkQueue = queue
+        senderThread = Thread {
+            while (true) {
+                val work = try {
+                    queue.take()
+                } catch (e: InterruptedException) {
+                    return@Thread
+                }
+                when (work) {
+                    is TxWork.Quit -> return@Thread
+                    is TxWork.Probe -> runProbe()
+                    is TxWork.Data -> try {
+                        doSendData(work.payload)
+                    } finally {
+                        pendingTxCount.updateAndGet { maxOf(0, it - 1) }
+                    }
+                }
+            }
+        }.apply {
+            name = "HCBlePeripheral-TX"
+            isDaemon = true
+            start()
+        }
+        return queue
+    }
+
+    @Synchronized
+    private fun stopSenderThread() {
+        txWorkQueue?.offer(TxWork.Quit)
+        txWorkQueue = null
+        senderThread = null
+    }
+
+    /** 연결 종료/재시작 시 송신 파이프라인 초기화: 대기 데이터 폐기, 프로브 상태 리셋 */
+    private fun resetTxPipeline() {
+        probedChunkSize = 0
+        pendingProbe?.latch?.countDown() // ackBytes=-1 유지 → 진행 중이던 프로브는 기각 처리
+        pendingProbe = null
+        txWorkQueue?.removeIf { it is TxWork.Data }
+        pendingTxCount.set(0)
+    }
+
+    /**
+     * 엔드투엔드 청크 프로브 (송신 스레드에서 실행).
+     *
+     * 사다리 후보 크기마다 길이 헤더 없는 raw notify(`PROBE:<seq>:<N>:` + 0xA5 패딩, 정확히 N바이트)를
+     * 1건 발사하고 Central의 `PROBE_ACK:<seq>:<수신바이트>`를 기다린다.
+     * ack 수신바이트 == N 일 때만 채택 — 절단(20B 도착)은 ack 불일치로 자동 기각되고,
+     * 프로브 유실은 타임아웃으로 기각된다. 전부 실패하면 MTU-3 폴백을 유지한다.
+     */
+    private fun runProbe() {
+        if (connectedDevice == null) return
+        Log.d(TAG, "[PROBE] 시작 — 사다리=${config.probeChunkLadder} timeout=${config.probeAckTimeoutMs}ms")
+
+        for (size in config.probeChunkLadder) {
+            if (connectedDevice == null) {
+                probedChunkSize = 0
+                return
+            }
+            val seq = probeSeq.incrementAndGet()
+            val header = "$PROBE_PREFIX$seq:$size:".toByteArray(Charsets.US_ASCII)
+            if (header.size > size) {
+                Log.w(TAG, "[PROBE] 후보 ${size}B가 헤더(${header.size}B)보다 작음 — 건너뜀")
+                continue
+            }
+            val payload = header.copyOf(size).also { it.fill(PROBE_PADDING, header.size, size) }
+
+            val pending = PendingProbe(seq, size)
+            pendingProbe = pending
+
+            if (!notifySingle(payload)) {
+                pendingProbe = null
+                Log.w(TAG, "[PROBE] notify 발사 실패 (${size}B seq=$seq)")
+                continue
+            }
+
+            pending.latch.await(config.probeAckTimeoutMs, TimeUnit.MILLISECONDS)
+            pendingProbe = null
+
+            if (pending.ackBytes == size) {
+                probedChunkSize = size
+                Log.i(TAG, "[PROBE] 채택: ${size}B (seq=$seq) → 실효 청크=${effectiveChunkSize}B")
+                listeners.forEach { it.onChunkSizeDetermined(effectiveChunkSize) }
+                return
+            }
+            Log.w(TAG, "[PROBE] 기각: 요청=${size}B ack=" +
+                if (pending.ackBytes >= 0) "${pending.ackBytes}B(불일치)" else "없음(타임아웃/유실)")
+        }
+
+        probedChunkSize = 0
+        Log.w(TAG, "[PROBE] 전 후보 실패 — 폴백 ${effectiveChunkSize}B 유지")
+        listeners.forEach { it.onChunkSizeDetermined(effectiveChunkSize) }
+    }
+
+    /**
+     * 청크 분할·프레이밍 없이 notify 1건을 그대로 발사한다 (프로브 전용).
+     * onNotificationSent 대기는 발사 순서 보장(pacing)용일 뿐, 전달 크기 판정에 쓰지 않는다.
+     */
+    private fun notifySingle(data: ByteArray): Boolean = synchronized(txLock) {
+        val device = connectedDevice ?: return false
+        val server = gattServer ?: return false
+        val characteristic = txCharacteristic ?: return false
+
+        notifySemaphore.drainPermits()
+
+        @Suppress("DEPRECATION")
+        characteristic.value = data
+
+        @Suppress("DEPRECATION")
+        val ok = server.notifyCharacteristicChanged(device, characteristic, false)
+        if (!ok) return false
+
+        notifySemaphore.tryAcquire(2, TimeUnit.SECONDS)
+        return true
+    }
+
+    private fun isProbeAck(value: ByteArray): Boolean {
+        val prefix = PROBE_ACK_PREFIX.toByteArray(Charsets.US_ASCII)
+        if (value.size < prefix.size) return false
+        for (i in prefix.indices) {
+            if (value[i] != prefix[i]) return false
+        }
+        return true
+    }
+
+    private fun handleProbeAck(value: ByteArray) {
+        val text = String(value, Charsets.US_ASCII).trim { it <= ' ' }
+        val parts = text.split(":")
+        val seq = parts.getOrNull(1)?.trim()?.toIntOrNull()
+        val bytes = parts.getOrNull(2)?.trim()?.toIntOrNull()
+        val pending = pendingProbe
+        Log.d(TAG, "[PROBE] ACK 수신: seq=$seq bytes=$bytes (대기중 seq=${pending?.seq})")
+        if (pending != null && seq == pending.seq && bytes != null) {
+            pending.ackBytes = bytes
+            pending.latch.countDown()
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // 프레이밍
+    // ────────────────────────────────────────────────────────────────────────
+
+    private fun frame(data: ByteArray): ByteArray =
+        if (config.crcFraming) prependCrcHeader(data) else prependLengthHeader(data)
+
+    /**
+     * CRC 프레임: `[0xA5 0x5A][길이 4B BE][payload CRC32 4B BE]` + payload.
+     * 수신 재조립기가 매직 스캔으로 재동기화하고 CRC로 프레임 무결성을 검증할 수 있다.
+     * [PeripheralConfig.crcFraming]이 켜져 있고 Central 쪽이 같은 포맷을 지원할 때만 사용.
+     */
+    private fun prependCrcHeader(data: ByteArray): ByteArray {
+        val len = data.size
+        val crc = CRC32().apply { update(data) }.value
+        return byteArrayOf(
+            0xA5.toByte(), 0x5A.toByte(),
+            (len shr 24 and 0xFF).toByte(),
+            (len shr 16 and 0xFF).toByte(),
+            (len shr 8 and 0xFF).toByte(),
+            (len and 0xFF).toByte(),
+            (crc shr 24 and 0xFF).toByte(),
+            (crc shr 16 and 0xFF).toByte(),
+            (crc shr 8 and 0xFF).toByte(),
+            (crc and 0xFF).toByte()
+        ) + data
     }
 
     private fun prependLengthHeader(data: ByteArray): ByteArray {
