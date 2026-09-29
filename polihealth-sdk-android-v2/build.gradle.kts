@@ -51,8 +51,11 @@ android {
             url = uri("https://maven.pkg.github.com/hconnectdx/bluetooth-sdk-android-v2")
 
             credentials {
-                username = "hconnectdx"
-                password = ""
+                val localProps = Properties().apply {
+                    load(FileInputStream(rootProject.file("local.properties")))
+                }
+                username = localProps.getProperty("githubUsername")
+                password = localProps.getProperty("githubAccessToken")
             }
         }
     }

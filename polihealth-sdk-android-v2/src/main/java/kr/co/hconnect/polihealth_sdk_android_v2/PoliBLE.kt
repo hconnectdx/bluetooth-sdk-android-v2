@@ -127,7 +127,7 @@ object PoliBLE {
         this.onReceive = onReceive
 
         HCBle.connectToDevice(
-            sessionId = device.name,
+            sessionId = device.name ?: device.address,
             isAutoConnect = autoConnect,
             device = device,
             onConnState = { state ->
