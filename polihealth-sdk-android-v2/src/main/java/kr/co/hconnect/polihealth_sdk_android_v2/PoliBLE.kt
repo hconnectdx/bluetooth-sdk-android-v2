@@ -53,6 +53,10 @@ object PoliBLE {
     private var prevByte: Byte = PROTOCOL_02_RESET_ORDER
     private var p2IsFirstPacket: Boolean = true
 
+    /** 현재 Protocol 02 회차에 길이가 부족한(잘린) 패킷이 있었는지. 마지막 패킷(0xFF)에서 초기화된다. */
+    @Volatile
+    private var p2PacketTruncated: Boolean = false
+
     // 수면 강제종료용 콜백함수
     private lateinit var onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
 
@@ -273,24 +277,65 @@ object PoliBLE {
 
         DailyProtocol02API.apply {
             CoroutineScope(Dispatchers.IO).launch {
-                // 시작 조건 검증
-                checkStartCondition(onReceive)
-                // 패킷 처리
-                handleDataPacket(dataOrder, onReceive)
+                // 여기서 예외가 나면 SDK 내부 코루틴에서 그대로 터져 앱이 종료되므로(앱에서 잡을 수 없음) 에러로 전달한다.
+                try {
+                    val isLastPacket = (dataOrder == PROTOCOL_LAST_PACKET)
 
-                // 데이터 추가 및 완료 처리
-                prevByte = dataOrder
+                    // MTU 미협상 등으로 패킷이 잘려 들어온 경우: 이번 회차 데이터는 쓸 수 없으므로 버리고,
+                    // 패킷마다 에러를 보내지 않도록 마지막 패킷(0xFF)에서 한 번만 알린다.
+                    val dataSize = byteArray.size - 2
+                    if (dataSize < requiredDataSize(isLastPacket)) {
+                        Log.w(
+                            TAG,
+                            "Protocol 02 패킷 길이 부족 (${byteArray.size}B, 순서=${dataOrder.toHexString()}) — 패킷 무시"
+                        )
+                        // 모든 패킷이 잘려 오면 START가 한 번도 나가지 않아 앱이 측정 화면을 띄우지 못하고
+                        // 사용자는 아무 안내도 받지 못한다 — 회차 첫 잘린 패킷에서 START를 대신 보낸다.
+                        if (!p2PacketTruncated && DailyProtocol02API.byteArray.isEmpty()) {
+                            onReceive.invoke(ProtocolType.PROTOCOL_2_START, null)
+                        }
+                        p2PacketTruncated = true
+                        if (isLastPacket) finishTruncatedProtocol02(onReceive)
+                        return@launch
+                    }
+                    if (isLastPacket && p2PacketTruncated) {
+                        finishTruncatedProtocol02(onReceive)
+                        return@launch
+                    }
 
-                val isLastPacket = (dataOrder == PROTOCOL_LAST_PACKET)
-                addByteNew(removeFrontTwoBytes(byteArray, 2), isLast = isLastPacket)
+                    // 시작 조건 검증
+                    checkStartCondition(onReceive)
+                    // 패킷 처리
+                    handleDataPacket(dataOrder, onReceive)
 
-                if (isLastPacket) {
-                    Log.d(TAG, "Protocol 02 완료 - 앱으로 전송")
-                    DailyServiceToApp.sendProtocol2ToApp(context, onReceive)
-                    handleLastPacket()
+                    // 데이터 추가 및 완료 처리
+                    prevByte = dataOrder
+
+                    addByteNew(removeFrontTwoBytes(byteArray, 2), isLast = isLastPacket)
+
+                    if (isLastPacket) {
+                        Log.d(TAG, "Protocol 02 완료 - 앱으로 전송")
+                        DailyServiceToApp.sendProtocol2ToApp(context, onReceive)
+                        handleLastPacket()
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Protocol 02 처리 실패 (${byteArray.size}B): ${e.message}")
+                    p2PacketTruncated = false
+                    resetProtocol02State()
+                    onReceive.invoke(ProtocolType.PROTOCOL_2_ERROR, null)
                 }
             }
         }
+    }
+
+    /** 잘린 패킷이 섞인 Protocol 02 회차를 서버 전송 없이 종료하고 앱에 알린다. */
+    private fun finishTruncatedProtocol02(
+        onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
+    ) {
+        Log.w(TAG, "Protocol 02 회차에 잘린 패킷이 있어 전송하지 않음 — PACKET_TRUNCATED 전달")
+        p2PacketTruncated = false
+        resetProtocol02State()
+        onReceive.invoke(ProtocolType.PROTOCOL_2_ERROR_PACKET_TRUNCATED, null)
     }
 
     /**
@@ -692,13 +737,24 @@ object PoliBLE {
      */
     fun stopSleepForce(context: Context, deviceAddress: String) {
         CoroutineScope(Dispatchers.IO).launch {
-            val response = SleepApiService().sendEndSleep(context)
-            val type = if (response.retCd == "0") {
-                ProtocolType.PROTOCOL_5_SLEEP_END
-            } else {
+            val type = try {
+                val response = SleepApiService().sendEndSleep(context)
+                if (response.retCd == "0") {
+                    ProtocolType.PROTOCOL_5_SLEEP_END
+                } else {
+                    ProtocolType.PROTOCOL_5_SLEEP_END_ERROR
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "stopSleepForce: 수면 종료 API 실패 - ${e.message}")
                 ProtocolType.PROTOCOL_5_SLEEP_END_ERROR
             }
-            onReceive(type, null)
+            // onReceive는 connectDevice()에서만 설정된다. 이번 프로세스에서 밴드 연결이 한 번도
+            // 안 된 상태(프로세스 재기동 후 미연결 등)에서 호출되면 결과를 전달할 대상이 없다.
+            if (::onReceive.isInitialized) {
+                onReceive(type, null)
+            } else {
+                Log.w(TAG, "stopSleepForce: onReceive 미설정(밴드 미연결) - 결과 전달 생략 ($type)")
+            }
         }
     }
 }

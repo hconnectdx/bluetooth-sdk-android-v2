@@ -173,8 +173,18 @@ object DailyProtocol01API {
      */
     fun categorizeData(bytes: ByteArray) {
         val sampleSize = 16
-        val totalSamples = 12
-        var offset = 2 // Skip header and dataNum
+        val headerSize = 2
+        val expectedSamples = 12
+        var offset = headerSize // Skip header and dataNum
+
+        // 패킷이 잘려서(MTU 미협상 등) 오면 고정 길이로 읽다가 범위를 벗어나 크래시가 나므로, 실제 길이만큼만 읽는다.
+        val totalSamples = minOf(expectedSamples, maxOf(0, (bytes.size - headerSize) / sampleSize))
+        if (totalSamples < expectedSamples) {
+            Log.w(
+                "DailyProtocol01API",
+                "categorizeData: 패킷 길이 부족 (${bytes.size}B, 기대 ${headerSize + sampleSize * expectedSamples}B) — 샘플 ${totalSamples}개만 처리"
+            )
+        }
 
         for (i in 0 until totalSamples) {
 

@@ -21,4 +21,7 @@ enum class ProtocolType {
     PROTOCOL_8_ERROR,
     PROTOCOL_9_HR_SpO2,
     PROTOCOL_9_ERROR,
+
+    /** Protocol 02 패킷이 기대 길이보다 짧게(잘려서) 수신됨 — BLE MTU 미협상 등 연결 문제로 해당 회차 데이터를 쓸 수 없음 */
+    PROTOCOL_2_ERROR_PACKET_TRUNCATED,
 }

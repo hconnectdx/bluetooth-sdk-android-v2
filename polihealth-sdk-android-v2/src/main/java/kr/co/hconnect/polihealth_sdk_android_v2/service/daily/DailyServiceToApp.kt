@@ -20,9 +20,10 @@ object DailyServiceToApp {
         byteArray: ByteArray,
         onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
     ) {
-        val hrSpO2: HRSpO2 =
-            HRSpO2Parser.asciiToHRSpO2(PoliBLE.removeFrontTwoBytes(byteArray, 1))
+        // 파싱까지 try 안에 둬야 한다 — 밖에서 예외가 나면 SDK 내부 코루틴에서 그대로 터져 앱이 종료된다.
         try {
+            val hrSpO2: HRSpO2 =
+                HRSpO2Parser.asciiToHRSpO2(PoliBLE.removeFrontTwoBytes(byteArray, 1))
             val response = DailyApiService().sendProtocol03(hrSpO2)
             onReceive.invoke(
                 ProtocolType.PROTOCOL_3_HR_SpO2,
@@ -63,9 +64,16 @@ object DailyServiceToApp {
         context: Context?,
         onReceive: (type: ProtocolType, response: PoliResponse?) -> Unit
     ) {
-        DailyProtocol01API.categorizeData(byteArray)
-        DailyProtocol01API.collectBytes(byteArray)
-        if (byteArray[1] == 0xFF.toByte()) {
+        // 여기서 예외가 나면 SDK 내부 코루틴에서 그대로 터져 앱이 종료되므로(앱에서 잡을 수 없음) 에러로 전달한다.
+        try {
+            DailyProtocol01API.categorizeData(byteArray)
+            DailyProtocol01API.collectBytes(byteArray)
+        } catch (e: Exception) {
+            Log.e(TAG, "sendProtocol01 패킷 처리 실패 (${byteArray.size}B): ${e.message}")
+            onReceive.invoke(ProtocolType.PROTOCOL_1_ERROR, null)
+            return
+        }
+        if (byteArray.getOrNull(1) == 0xFF.toByte()) {
 
             try {
                 DailyProtocol01API.createLTMModel()

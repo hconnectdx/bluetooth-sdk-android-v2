@@ -57,6 +57,9 @@ object DailyProtocol02API {
         byteArray = byteArrayOf()
     }
 
+    /** 헤더 2바이트를 뗀 데이터 영역의 최소 길이 — 오프셋 값을 [78..80] / [234..236]에서 읽는다. */
+    fun requiredDataSize(isLast: Boolean): Int = if (isLast) 81 else 237
+
     /**
      * 바이트 배열을 처리하여 13비트 청크로 분할하고 처리합니다.
      */
@@ -67,6 +70,10 @@ object DailyProtocol02API {
 
         // 1. 입력 데이터 준비 및 검증
         val dataSize = byteArray.size
+        if (dataSize < requiredDataSize(isLast)) {
+            Log.w(TAG, "addByteNew: 데이터 길이 부족 (${dataSize}B, 최소 ${requiredDataSize(isLast)}B) — 패킷 무시")
+            return
+        }
         val processingSize = minOf(dataSize, offsetIndexStart)
 
         // 2. 오프셋 값 추출
