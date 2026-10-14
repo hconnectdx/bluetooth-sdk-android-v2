@@ -96,6 +96,13 @@ object HCBle {
     private var connectingDevices = mutableSetOf<String>()
     private var disconnectingDevices = mutableSetOf<String>()
 
+    // 연결이 한 번 성립된 기기. 사용자가 disconnect()/forceDisconnect()/disconnectAll() 하면 빠진다.
+    // 여기 있는 기기가 끊기면(=사용자가 끊은 게 아님) 연결 실패가 아니라 링크 손실로 보고 다시 연결한다.
+    private val establishedLinks: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    // 링크 손실 후 autoConnect 재연결을 기다리는 GATT. 닫지 않고 두어야 Android가 기기를 다시 보는 즉시 붙인다.
+    private val linkLossGatts = ConcurrentHashMap<String, BluetoothGatt>()
+
     // 스캔된 디바이스 중복 방지 (전역 관리)
     private var recentlyFoundDevices = mutableMapOf<String, Long>()
     private val DEVICE_FOUND_COOLDOWN = 2000L // 2초 쿨다운
@@ -587,6 +594,16 @@ object HCBle {
     ) {
         val deviceAddress = device.address
 
+        // 링크 손실 후 재연결 대기 중이던 GATT가 있으면 닫고 새로 연결한다 (같은 기기에 GATT 클라이언트가 둘 생기지 않도록).
+        linkLossGatts.remove(deviceAddress)?.let { pending ->
+            Logger.w("Replacing pending link-loss reconnection for $deviceAddress with explicit connect")
+            try {
+                pending.close()
+            } catch (e: Exception) {
+                Logger.e("Failed to close pending link-loss GATT: ${e.message}")
+            }
+        }
+
         // 연결 상태 체크 강화
         if (isConnecting(deviceAddress)) {
             Logger.e("Device is already connecting: ${device.name} ($deviceAddress)")
@@ -814,6 +831,38 @@ object HCBle {
         }
     }
 
+    /**
+     * 성립돼 있던 연결이 사용자 요청 없이 끊겼을 때(링크 손실) 처리한다.
+     *
+     * 경찰 밴드는 측정 직후 ~34초 주기로 기존 연결에 응답을 멈추고(supervision timeout, status 8) 곧바로 새 연결을 받는다.
+     * 예전에는 이를 연결 실패로 보고 close() 해서, Android가 0.06초 만에 다시 붙인 autoConnect 연결까지 끊고 포기했다.
+     *
+     * - GATT는 닫지 않고 connect() 로 백그라운드 재연결을 다시 걸어 둔다 (기기가 다시 보이면 OS가 바로 연결).
+     * - 이전 GATTController는 버린다 (쓰기 큐·진행 중 플래그가 끊긴 연결 기준으로 남아 있음). 재연결되면 새로 만든다.
+     * - 앱에는 DISCONNECTED 를 알린다. 재연결되면 STATE_CONNECTED → 서비스 탐색 → onGattServiceState 가 다시 온다.
+     */
+    private fun handleLinkLoss(
+        address: String,
+        gatt: BluetoothGatt,
+        status: Int,
+        onConnState: ((state: Int) -> Unit)?
+    ) {
+        Logger.w("Link lost for $address (status=$status). Keeping GATT open for auto reconnect")
+
+        mapBLEGatt.remove(address)
+        connectingDevices.remove(address)
+        disconnectingDevices.remove(address)
+        linkLossGatts[address] = gatt
+
+        try {
+            if (!gatt.connect()) Logger.e("gatt.connect() returned false for $address")
+        } catch (e: Exception) {
+            Logger.e("Failed to request auto reconnect for $address: ${e.message}")
+        }
+
+        onConnState?.invoke(BLEState.STATE_DISCONNECTED)
+    }
+
     fun getGattController(deviceAddress: String): GATTController? {
         return mapBLEGatt[deviceAddress]
     }
@@ -845,6 +894,15 @@ object HCBle {
                 super.onConnectionStateChange(gatt, status, newState)
                 logConnStateChange("onConnectionStateChange", gatt, newState)
                 val address = gatt?.device?.address ?: ""
+
+                // 성립돼 있던 연결이 사용자 요청 없이 끊긴 경우(밴드 무응답 status 8, 밴드가 끊음 19 등).
+                // 연결 실패로 처리해 close() 하면 Android의 autoConnect 재연결까지 끊기므로, 닫지 않고 다시 붙기를 기다린다.
+                if (newState == BluetoothProfile.STATE_DISCONNECTED && autoConnect && gatt != null &&
+                    establishedLinks.remove(address)
+                ) {
+                    handleLinkLoss(address, gatt, status, onConnState)
+                    return
+                }
 
                 // status 체크 (에러 처리)
                 when (status) {
@@ -908,6 +966,10 @@ object HCBle {
                     BluetoothProfile.STATE_CONNECTED -> {
                         Logger.d("Device connected to $address")
                         connectingDevices.remove(address)
+                        establishedLinks.add(address)
+                        if (linkLossGatts.remove(address) != null) {
+                            Logger.i("Reconnected after link loss: $address")
+                        }
 
                         // 연결 성공 시에만 GATTController 생성 (중복 방지)
                         if (!mapBLEGatt.containsKey(address) && gatt != null) {
@@ -1070,6 +1132,9 @@ object HCBle {
      */
     fun disconnect(address: String, callback: (() -> Unit)? = null) {
 
+        // 끊김 콜백이 정리보다 먼저 와도 링크 손실(자동 재연결)로 처리되지 않도록 가장 먼저 뺀다.
+        establishedLinks.remove(address)
+
         // 재시도 정보 제거
         connectionRetryInfoMap.remove(address)
         Logger.d("Cleared retry info for $address")
@@ -1109,6 +1174,16 @@ object HCBle {
             // Map에서 제거
             mapBLEGatt.remove(address)
 
+            // 사용자가 끊은 것이므로 링크 손실 재연결 대상에서 뺀다.
+            establishedLinks.remove(address)
+            linkLossGatts.remove(address)?.let { pending ->
+                try {
+                    pending.close()
+                } catch (e: Exception) {
+                    Logger.e("Failed to close pending link-loss GATT: ${e.message}")
+                }
+            }
+
             // BroadcastReceiver 해제
             bondStateReceivers[address]?.let { receiver ->
                 try {
@@ -1138,6 +1213,9 @@ object HCBle {
      * 강제 연결 해제 함수
      */
     fun forceDisconnect(address: String) {
+        // 끊김 콜백이 정리보다 먼저 와도 링크 손실(자동 재연결)로 처리되지 않도록 가장 먼저 뺀다.
+        establishedLinks.remove(address)
+
         // 재시도 정보 제거
         connectionRetryInfoMap.remove(address)
         Logger.d("forceDisconnect address: $address")
@@ -1175,7 +1253,7 @@ object HCBle {
         // 모든 스캔 중지
         stopAllScans()
 
-        val addressList = mapBLEGatt.keys.toList()
+        val addressList = (mapBLEGatt.keys + linkLossGatts.keys).toSet().toList()
 
         // 각 디바이스를 순차적으로 연결 해제
         addressList.forEach { address ->
@@ -1205,6 +1283,8 @@ object HCBle {
         disconnectingDevices.clear()
         recentlyFoundDevices.clear()
         mapBLEGatt.clear()
+        establishedLinks.clear()
+        linkLossGatts.clear()
 
         Logger.d("disconnectAll: All devices disconnected and resources cleaned")
     }
