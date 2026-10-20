@@ -2,6 +2,7 @@ package kr.co.hconnect.polihealth_sdk_android_v2
 
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.HttpResponseValidator
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.HttpSendPipeline
@@ -10,6 +11,7 @@ import io.ktor.client.statement.HttpReceivePipeline
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.content.OutgoingContent
 import io.ktor.http.encodedPath
+import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.util.AttributeKey
 import io.ktor.util.toByteArray
@@ -55,6 +57,19 @@ object PoliClient {
 
             engine {
                 pipelining = true
+            }
+
+            // 상태 코드를 검사하지 않으면 5xx 오류 페이지(HTML)를 응답 객체로 바꾸다 실패해서,
+            // 서버 장애가 밴드 측정 오류와 구분되지 않았다 (2026-10 인증서 만료 장애).
+            HttpResponseValidator {
+                validateResponse { response ->
+                    if (!response.status.isSuccess()) {
+                        throw PoliServerException(
+                            response.status.value,
+                            "HTTP ${response.status.value} ${response.call.request.url.encodedPath}"
+                        )
+                    }
+                }
             }
         }
 

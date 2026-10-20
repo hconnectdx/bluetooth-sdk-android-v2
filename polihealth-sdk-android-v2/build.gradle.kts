@@ -99,6 +99,12 @@ val githubUrl: String = rootProjectProps.getProperty("githubUrl")
 val githubUsername: String = rootProjectProps.getProperty("githubUsername")
 val githubAccessToken: String = rootProjectProps.getProperty("githubAccessToken")
 
+// publication이 빌드 산출물 AAR 파일을 직접 참조하므로, 배포 전에 항상 release AAR을 새로 빌드한다.
+// (의존성이 없으면 이전에 빌드해 둔 AAR이 새 버전 번호로 그대로 배포된다)
+tasks.withType<AbstractPublishToMaven>().configureEach {
+    dependsOn("assembleRelease")
+}
+
 afterEvaluate {
     publishing {
         publications {

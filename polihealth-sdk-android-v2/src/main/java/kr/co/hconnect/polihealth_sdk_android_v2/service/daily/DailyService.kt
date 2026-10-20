@@ -1,5 +1,6 @@
 package kr.co.hconnect.polihealth_sdk_android_v2.service.daily
 
+import kr.co.hconnect.polihealth_sdk_android_v2.poliServerCall
 import android.content.Context
 import android.os.Build
 import android.util.Log
@@ -51,7 +52,9 @@ class DailyApiService {
             }
         }
 
-        return try {
+        // 예전에는 여기서 예외를 삼키고 retCd="500" 응답을 PROTOCOL_1(성공)로 넘겨서 서버 장애를 앱이 알 수 없었다.
+        // 이제 PoliServerException으로 던져서 PROTOCOL_1_ERROR + PoliServerErrorResponse로 전달되게 한다.
+        return poliServerCall {
             DailyProtocol01API.requestPost(
                 DateUtil.getCurrentDateTime(),
                 DailyProtocol01API.ltmModel ?: LTMModel(
@@ -60,13 +63,6 @@ class DailyApiService {
                     arrayOf()
                 ) // 내일 바로 테스트
             )
-        } catch (e: Exception) {
-            Log.e(TAG, "sendProtocol01New: ${e.message}")
-            return Daily1Response().apply {
-                retCd = "500"
-                retMsg = e.message ?: "Unknown error"
-                resDate = DateUtil.getCurrentDateTime()
-            }
         }
     }
 
@@ -80,10 +76,12 @@ class DailyApiService {
         val protocol2Bytes = DailyProtocol02API.flush(context)
         if (protocol2Bytes.isNotEmpty()) {
 
-            return DailyProtocol02API.requestPost(
-                DateUtil.getCurrentDateTime(),
-                protocol2Bytes
-            )
+            return poliServerCall {
+                DailyProtocol02API.requestPost(
+                    DateUtil.getCurrentDateTime(),
+                    protocol2Bytes
+                )
+            }
         } else {
             throw Exception("Protocol02 bytes is empty")
         }
@@ -96,9 +94,11 @@ class DailyApiService {
      * @return SleepCommResponse
      */
     suspend fun sendProtocol03(hrSpo2: HRSpO2): Daily3Response {
-        return DailyProtocol03API.requestPost(
-            DateUtil.getCurrentDateTime(),
-            hrSpo2
-        )
+        return poliServerCall {
+            DailyProtocol03API.requestPost(
+                DateUtil.getCurrentDateTime(),
+                hrSpo2
+            )
+        }
     }
 }
