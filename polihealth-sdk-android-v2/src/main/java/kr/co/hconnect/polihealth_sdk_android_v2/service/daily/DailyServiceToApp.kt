@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.annotation.RequiresApi
 import kr.co.hconnect.polihealth_sdk_android_v2.HRSpO2Parser
 import kr.co.hconnect.polihealth_sdk_android_v2.ProtocolType
+import kr.co.hconnect.polihealth_sdk_android_v2.toServerErrorResponse
 import kr.co.hconnect.polihealth_sdk_android_v2.api.daily.DailyProtocol01API
 import kr.co.hconnect.polihealth_sdk_android_v2.api.dto.response.PoliResponse
 import kr.co.hconnect.polihealth_sdk_android_v2.PoliBLE
@@ -31,7 +32,7 @@ object DailyServiceToApp {
             )
         } catch (e: Exception) {
             Log.e(TAG, "sendProtocol03: ${e.message}")
-            onReceive.invoke(ProtocolType.PROTOCOL_3_HR_SpO2_ERROR, null)
+            onReceive.invoke(ProtocolType.PROTOCOL_3_HR_SpO2_ERROR, e.toServerErrorResponse())
         }
     }
 
@@ -51,7 +52,7 @@ object DailyServiceToApp {
 
             } catch (e: Exception) {
                 Log.e(TAG, "sendProtocol02: ${e.message}")
-                onReceive.invoke(ProtocolType.PROTOCOL_2_ERROR, null)
+                onReceive.invoke(ProtocolType.PROTOCOL_2_ERROR, e.toServerErrorResponse())
             } finally {
                 prevByte = 0x00
                 byteArray = ByteArray(0)
@@ -82,7 +83,7 @@ object DailyServiceToApp {
                 onReceive.invoke(ProtocolType.PROTOCOL_1, response)
             } catch (e: Exception) {
                 Log.e(TAG, "sendProtocol01: ${e.message}")
-                onReceive.invoke(ProtocolType.PROTOCOL_1_ERROR, null)
+                onReceive.invoke(ProtocolType.PROTOCOL_1_ERROR, e.toServerErrorResponse())
             } finally {
                 DailyProtocol01API.clearCollectedBytes()
 
