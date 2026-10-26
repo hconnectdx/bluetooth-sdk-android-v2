@@ -1,6 +1,7 @@
 package kr.co.hconnect.polihealth_sdk_android_v2.service.daily
 
 import kr.co.hconnect.polihealth_sdk_android_v2.poliServerCall
+import kr.co.hconnect.polihealth_sdk_android_v2.PoliClient
 import android.content.Context
 import android.os.Build
 import android.util.Log
@@ -29,7 +30,8 @@ class DailyApiService {
     suspend fun sendProtocol01(ltmModel: LTMModel): Daily1Response {
         return DailyProtocol01API.requestPost(
             DateUtil.getCurrentDateTime(),
-            ltmModel
+            ltmModel,
+            PoliClient.requireUserWeight()
         )
     }
 
@@ -52,6 +54,10 @@ class DailyApiService {
             }
         }
 
+        // 몸무게 미설정은 서버 오류가 아니라 앱 설정 누락이므로 poliServerCall 밖에서 확인한다
+        // (PROTOCOL_1_ERROR + response=null로 전달됨)
+        val userWeight = PoliClient.requireUserWeight()
+
         // 예전에는 여기서 예외를 삼키고 retCd="500" 응답을 PROTOCOL_1(성공)로 넘겨서 서버 장애를 앱이 알 수 없었다.
         // 이제 PoliServerException으로 던져서 PROTOCOL_1_ERROR + PoliServerErrorResponse로 전달되게 한다.
         return poliServerCall {
@@ -61,7 +67,8 @@ class DailyApiService {
                     arrayOf(),
                     arrayOf(),
                     arrayOf()
-                ) // 내일 바로 테스트
+                ), // 내일 바로 테스트
+                userWeight
             )
         }
     }

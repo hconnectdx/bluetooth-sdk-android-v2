@@ -22,6 +22,21 @@ object PoliClient {
     private var baseUrl: String = ""
     var userAge: Int = 0
     var userSno: Int = 0
+
+    /**
+     * 사용자 몸무게(kg, 정수). Protocol 01(일상측정 LTM) 전송 시 서버 필수값 — 활동량(METs) 칼로리 계산에 쓰인다.
+     * 설정하지 않았거나 0 이하이면 Protocol 01을 서버로 보내지 않고 PROTOCOL_1_ERROR(response=null)로 전달한다.
+     */
+    var userWeight: Int? = null
+
+    /** Protocol 01 전송 전에 몸무게가 설정됐는지 확인한다. 없으면 [IllegalStateException] */
+    internal fun requireUserWeight(): Int {
+        val weight = userWeight
+        check(weight != null && weight > 0) {
+            "PoliClient.userWeight가 설정되지 않았습니다 (현재값=$weight). Protocol 01 전송 전에 사용자 몸무게(kg)를 설정하세요."
+        }
+        return weight
+    }
     var sessionId: String = ""
 
 
@@ -64,9 +79,13 @@ object PoliClient {
             HttpResponseValidator {
                 validateResponse { response ->
                     if (!response.status.isSuccess()) {
+                        // 서버가 다른 서버를 호출하다 인증서 문제로 실패해 5xx를 주는 경우도 인증서 오류로 구분한다
+                        val body = response.call.attributes.getOrNull(AttributeKey<String>("body"))
+                            ?: runCatching { response.bodyAsText() }.getOrNull()
                         throw PoliServerException(
-                            response.status.value,
-                            "HTTP ${response.status.value} ${response.call.request.url.encodedPath}"
+                            httpCode = response.status.value,
+                            message = "HTTP ${response.status.value} ${response.call.request.url.encodedPath}",
+                            isCertificateExpired = body.mentionsCertificateFailure()
                         )
                     }
                 }
