@@ -39,18 +39,20 @@ object DailyProtocol01API {
      *
      * @param reqDate ex) 20240704054513 (yyyyMMddHHmmss)
      * @param LTMModel
+     * @param userWeight 사용자 몸무게(kg, 정수) — 서버 필수값. METs 항목마다 넣어서 보낸다. [PoliClient.requireUserWeight]로 확인한 값을 넘긴다.
      *
      * @return Protocol1Response
      * */
     suspend fun requestPost(
         reqDate: String,
-        ltmModel: LTMModel
+        ltmModel: LTMModel,
+        userWeight: Int
     ): Daily1Response {
 
         val requestBody = LTMRequest(
             reqDate = reqDate,
             userSno = PoliClient.userSno,
-            data = ltmModel
+            data = ltmModel.withUserWeight(userWeight)
         )
 
         val response = PoliClient.client.post("poli/day/protocol1") {
@@ -417,3 +419,7 @@ object DailyProtocol01API {
         0x00
     )
 }
+
+/** 서버는 METs 항목마다 몸무게로 활동량 칼로리를 계산하므로, 모든 METs 항목에 몸무게를 넣은 사본을 만든다 */
+internal fun LTMModel.withUserWeight(userWeight: Int): LTMModel =
+    copy(mets = mets.map { it.copy(userWeight = userWeight) }.toTypedArray())

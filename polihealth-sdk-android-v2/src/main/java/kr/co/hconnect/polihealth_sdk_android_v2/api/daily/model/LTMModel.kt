@@ -24,10 +24,16 @@ data class LTMModel(
         var time: String? = null
     )
 
+    /**
+     * @property userWeight 사용자 몸무게(kg, 정수) — 서버 필수값. 서버가 METs 항목마다 활동량 칼로리를 계산하므로
+     *           모든 항목에 들어가야 한다. 밴드 파싱 시점에는 null이고, 서버 전송 직전에 채운다
+     *           ([kr.co.hconnect.polihealth_sdk_android_v2.api.daily.DailyProtocol01API.requestPost]).
+     */
     @Serializable
     data class Mets(
         val mets: Int,
-        var time: String? = null
+        var time: String? = null,
+        val userWeight: Int? = null
     )
 
     // 자동 생성 코드
